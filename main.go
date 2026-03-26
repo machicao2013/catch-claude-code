@@ -62,21 +62,19 @@ func run() int {
 
 	summary := display.NewSummary()
 
-	// Determine upstream API URL
-	// Priority: CLAUDE_SPY_UPSTREAM env > ANTHROPIC_BASE_URL env > extract from binary
-	upstreamURL := os.Getenv("CLAUDE_SPY_UPSTREAM")
-	if upstreamURL == "" {
-		upstreamURL = os.Getenv("ANTHROPIC_BASE_URL")
+	// Find claude binary and extract the real API URL from it
+	claudePath := launcher.FindClaude()
+	if claudePath == "" {
+		fmt.Fprintf(os.Stderr, "Error: claude-internal not found\n")
+		return 1
 	}
 
-	claudePath := launcher.FindClaude()
-
+	upstreamURL := os.Getenv("CLAUDE_SPY_UPSTREAM")
 	if upstreamURL == "" {
-		// Try to extract from the claude binary
 		upstreamURL = launcher.ExtractUpstreamURL(claudePath)
 	}
 	if upstreamURL == "" {
-		fmt.Fprintf(os.Stderr, "Error: cannot determine API URL. Set CLAUDE_SPY_UPSTREAM or ANTHROPIC_BASE_URL\n")
+		fmt.Fprintf(os.Stderr, "Error: cannot determine API URL. Set CLAUDE_SPY_UPSTREAM\n")
 		return 1
 	}
 
@@ -84,6 +82,7 @@ func run() int {
 		fmt.Fprintf(os.Stderr, "[claude-spy] Upstream API: %s\n", upstreamURL)
 	}
 
+	// Start the proxy server
 	handler := proxy.NewHandler(upstreamURL, rec, printer, summary, saveSSE)
 
 	var srv *proxy.Server
@@ -104,13 +103,28 @@ func run() int {
 
 	if !quiet {
 		fmt.Fprintf(os.Stderr, "[claude-spy] Proxy listening on %s\n", srv.BaseURL())
-		fmt.Fprintf(os.Stderr, "[claude-spy] Logging to %s\n\n", logPath)
+		fmt.Fprintf(os.Stderr, "[claude-spy] Logging to %s\n", logPath)
 	}
 
-	env := launcher.BuildEnv(srv.BaseURL(), os.Environ())
+	// Create a patched copy of claude-internal with the API URL pointing to our proxy.
+	// claude-internal hardcodes the gateway URL and overrides ANTHROPIC_BASE_URL at startup,
+	// so setting env vars doesn't work. We binary-patch the URL instead.
+	proxyURL := srv.BaseURL()
+	patchedPath, err := launcher.PatchBinary(claudePath, upstreamURL, proxyURL)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error: patch binary: %v\n", err)
+		return 1
+	}
+	defer os.Remove(patchedPath)
 
+	if !quiet {
+		fmt.Fprintf(os.Stderr, "[claude-spy] Patched binary: %s\n\n", patchedPath)
+	}
+
+	// Launch the patched claude-internal
+	env := os.Environ()
 	sessionStart := time.Now()
-	exitCode, err := launcher.Launch(claudePath, claudeArgs, env)
+	exitCode, err := launcher.Launch(patchedPath, claudeArgs, env)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		return 1

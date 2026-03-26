@@ -44,8 +44,17 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	h.handleMessages(w, r)
 }
 
+// cleanPath extracts the API path (e.g. "/v1/messages") from possibly padded paths.
+// The patched binary may produce paths like "/xxxx/v1/messages".
+func cleanPath(rawPath string) string {
+	if idx := strings.Index(rawPath, "/v1/"); idx >= 0 {
+		return rawPath[idx:]
+	}
+	return rawPath
+}
+
 func (h *Handler) forwardSimple(w http.ResponseWriter, r *http.Request) {
-	proxyReq, err := http.NewRequestWithContext(r.Context(), r.Method, h.targetURL+r.URL.Path, r.Body)
+	proxyReq, err := http.NewRequestWithContext(r.Context(), r.Method, h.targetURL+cleanPath(r.URL.Path), r.Body)
 	if err != nil {
 		http.Error(w, "proxy error", http.StatusBadGateway)
 		return
@@ -77,7 +86,7 @@ func (h *Handler) handleMessages(w http.ResponseWriter, r *http.Request) {
 
 	h.printReqSummary(reqNum, reqBody)
 
-	proxyReq, err := http.NewRequestWithContext(r.Context(), "POST", h.targetURL+r.URL.Path, bytes.NewReader(reqBody))
+	proxyReq, err := http.NewRequestWithContext(r.Context(), "POST", h.targetURL+cleanPath(r.URL.Path), bytes.NewReader(reqBody))
 	if err != nil {
 		http.Error(w, "proxy error", http.StatusBadGateway)
 		return

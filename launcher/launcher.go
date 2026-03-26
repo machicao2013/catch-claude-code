@@ -2,10 +2,12 @@ package launcher
 
 import (
 	"bufio"
+	"bytes"
 	"fmt"
 	"os"
 	"os/exec"
 	"os/signal"
+	"path/filepath"
 	"regexp"
 	"strings"
 	"syscall"
@@ -67,6 +69,38 @@ func ExtractUpstreamURL(claudePath string) string {
 		}
 	}
 	return ""
+}
+
+// PatchBinary copies the claude binary and replaces the upstream URL with the proxy URL.
+// The proxy URL is right-padded with '/' to match the original URL length.
+// Returns the path to the patched temporary file.
+func PatchBinary(claudePath, upstreamURL, proxyURL string) (string, error) {
+	data, err := os.ReadFile(claudePath)
+	if err != nil {
+		return "", fmt.Errorf("read binary: %w", err)
+	}
+
+	// Pad proxyURL to same length as upstreamURL
+	padded := proxyURL
+	for len(padded) < len(upstreamURL) {
+		padded += "/"
+	}
+	if len(padded) != len(upstreamURL) {
+		return "", fmt.Errorf("proxy URL %q (%d) cannot be padded to match upstream URL %q (%d)",
+			proxyURL, len(proxyURL), upstreamURL, len(upstreamURL))
+	}
+
+	// Replace all occurrences
+	patched := bytes.ReplaceAll(data, []byte(upstreamURL), []byte(padded))
+
+	// Write to temp file
+	tmpDir := os.TempDir()
+	tmpFile := filepath.Join(tmpDir, "claude-spy-patched")
+	if err := os.WriteFile(tmpFile, patched, 0755); err != nil {
+		return "", fmt.Errorf("write patched binary: %w", err)
+	}
+
+	return tmpFile, nil
 }
 
 func Launch(claudePath string, args []string, env []string) (int, error) {
