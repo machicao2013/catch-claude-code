@@ -63,14 +63,25 @@ func run() int {
 	summary := display.NewSummary()
 
 	// Determine upstream API URL
-	// Priority: CLAUDE_SPY_UPSTREAM env > ANTHROPIC_BASE_URL env > default
+	// Priority: CLAUDE_SPY_UPSTREAM env > ANTHROPIC_BASE_URL env > extract from binary
 	upstreamURL := os.Getenv("CLAUDE_SPY_UPSTREAM")
 	if upstreamURL == "" {
 		upstreamURL = os.Getenv("ANTHROPIC_BASE_URL")
 	}
+
+	claudePath := launcher.FindClaude()
+
 	if upstreamURL == "" {
-		// Default for Claude Code Internal (Tencent)
-		upstreamURL = "https://copilot.code.woa.com/server/chat/codebuddy-gateway/codebuddy-code"
+		// Try to extract from the claude binary
+		upstreamURL = launcher.ExtractUpstreamURL(claudePath)
+	}
+	if upstreamURL == "" {
+		fmt.Fprintf(os.Stderr, "Error: cannot determine API URL. Set CLAUDE_SPY_UPSTREAM or ANTHROPIC_BASE_URL\n")
+		return 1
+	}
+
+	if !quiet {
+		fmt.Fprintf(os.Stderr, "[claude-spy] Upstream API: %s\n", upstreamURL)
 	}
 
 	handler := proxy.NewHandler(upstreamURL, rec, printer, summary, saveSSE)
@@ -96,7 +107,6 @@ func run() int {
 		fmt.Fprintf(os.Stderr, "[claude-spy] Logging to %s\n\n", logPath)
 	}
 
-	claudePath := launcher.FindClaude()
 	env := launcher.BuildEnv(srv.BaseURL(), os.Environ())
 
 	sessionStart := time.Now()

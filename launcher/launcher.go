@@ -1,10 +1,12 @@
 package launcher
 
 import (
+	"bufio"
 	"fmt"
 	"os"
 	"os/exec"
 	"os/signal"
+	"regexp"
 	"strings"
 	"syscall"
 )
@@ -34,6 +36,37 @@ func BuildEnv(proxyURL string, currentEnv []string) []string {
 	}
 	env = append(env, "ANTHROPIC_BASE_URL="+proxyURL)
 	return env
+}
+
+// ExtractUpstreamURL tries to find the real API base URL from the claude binary.
+// It scans the binary for known URL patterns. Returns empty string if not found.
+func ExtractUpstreamURL(claudePath string) string {
+	if claudePath == "" {
+		return ""
+	}
+
+	f, err := os.Open(claudePath)
+	if err != nil {
+		return ""
+	}
+	defer f.Close()
+
+	// Match URLs like https://copilot.code.woa.com/.../codebuddy-code
+	// or https://api.anthropic.com
+	re := regexp.MustCompile(`https://[a-zA-Z0-9._-]+/[a-zA-Z0-9/_-]*codebuddy-code`)
+
+	scanner := bufio.NewScanner(f)
+	scanner.Buffer(make([]byte, 1024*1024), 10*1024*1024)
+	for scanner.Scan() {
+		matches := re.FindAllString(scanner.Text(), -1)
+		for _, m := range matches {
+			// Prefer the non-offline endpoint
+			if !strings.Contains(m, "offline") {
+				return m
+			}
+		}
+	}
+	return ""
 }
 
 func Launch(claudePath string, args []string, env []string) (int, error) {
