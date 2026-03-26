@@ -62,10 +62,15 @@ func run() int {
 
 	summary := display.NewSummary()
 
-	upstreamURL := os.Getenv("ANTHROPIC_BASE_URL")
+	// Determine upstream API URL
+	// Priority: CLAUDE_SPY_UPSTREAM env > ANTHROPIC_BASE_URL env > default
+	upstreamURL := os.Getenv("CLAUDE_SPY_UPSTREAM")
 	if upstreamURL == "" {
-		fmt.Fprintf(os.Stderr, "Error: ANTHROPIC_BASE_URL not set\n")
-		return 1
+		upstreamURL = os.Getenv("ANTHROPIC_BASE_URL")
+	}
+	if upstreamURL == "" {
+		// Default for Claude Code Internal (Tencent)
+		upstreamURL = "https://copilot.code.woa.com/server/chat/codebuddy-gateway/codebuddy-code"
 	}
 
 	handler := proxy.NewHandler(upstreamURL, rec, printer, summary, saveSSE)
