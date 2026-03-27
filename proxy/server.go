@@ -1,3 +1,4 @@
+// proxy/server.go
 package proxy
 
 import (
@@ -14,7 +15,7 @@ type Server struct {
 }
 
 func NewServer(port int, handler http.Handler) (*Server, error) {
-	addr := fmt.Sprintf("127.0.0.1:%d", port)
+	addr := fmt.Sprintf("0.0.0.0:%d", port)
 	listener, err := net.Listen("tcp", addr)
 	if err != nil {
 		return nil, fmt.Errorf("listen on %s: %w", addr, err)
@@ -38,7 +39,7 @@ func (s *Server) Port() int {
 }
 
 func (s *Server) BaseURL() string {
-	return fmt.Sprintf("http://127.0.0.1:%d", s.port)
+	return fmt.Sprintf("http://0.0.0.0:%d", s.port)
 }
 
 func (s *Server) Start() {

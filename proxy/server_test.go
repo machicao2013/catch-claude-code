@@ -1,8 +1,10 @@
+// proxy/server_test.go
 package proxy
 
 import (
 	"context"
 	"net/http"
+	"strings"
 	"testing"
 	"time"
 )
@@ -23,8 +25,15 @@ func TestServer_RandomPort(t *testing.T) {
 		t.Error("port should not be 0")
 	}
 
+	// BaseURL 应绑定 0.0.0.0
+	if !strings.HasPrefix(srv.BaseURL(), "http://0.0.0.0:") {
+		t.Errorf("BaseURL = %q, want prefix http://0.0.0.0:", srv.BaseURL())
+	}
+
+	// 用 127.0.0.1 仍可访问（0.0.0.0 包含本地回环）
 	client := &http.Client{Timeout: 2 * time.Second}
-	resp, err := client.Get(srv.BaseURL() + "/test")
+	localURL := strings.Replace(srv.BaseURL(), "0.0.0.0", "127.0.0.1", 1)
+	resp, err := client.Get(localURL + "/test")
 	if err != nil {
 		t.Fatalf("GET: %v", err)
 	}
