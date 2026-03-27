@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"strconv"
 	"syscall"
 	"time"
 
@@ -29,6 +30,14 @@ func main() {
 }
 
 func run() int {
+	// Handle --help first, before parsing other args
+	for _, a := range os.Args[1:] {
+		if a == "--help" || a == "-h" {
+			printUsage()
+			return 0
+		}
+	}
+
 	args := parseArgs(os.Args[1:])
 
 	// --upstream 必填，且须为合法 URL（有 scheme 和 host）
@@ -72,7 +81,7 @@ func run() int {
 	sessionStart := time.Now() // 记录 session 开始时间，用于退出时统计
 
 	// 启动信息始终打印（--quiet 只抑制实时摘要）
-	fmt.Fprintf(os.Stderr, "[claude-spy] Upstream API:  %s\n", args.upstream)
+	fmt.Fprintf(os.Stderr, "[claude-spy] Upstream API: %s\n", args.upstream)
 	fmt.Fprintf(os.Stderr, "[claude-spy] Proxy listening on http://0.0.0.0:%d\n", srv.Port())
 	fmt.Fprintf(os.Stderr, "[claude-spy] Set ANTHROPIC_BASE_URL=http://<your-ip>:%d\n", srv.Port())
 	fmt.Fprintf(os.Stderr, "[claude-spy] Logging to %s\n\n", logPath)
@@ -81,11 +90,14 @@ func run() int {
 	sigCh := make(chan os.Signal, 1)
 	signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
 	<-sigCh
+	signal.Stop(sigCh)
 
 	// 优雅关闭，10s 超时
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	srv.Shutdown(shutdownCtx)
+	if err := srv.Shutdown(shutdownCtx); err != nil {
+		fmt.Fprintf(os.Stderr, "[claude-spy] Shutdown: %v\n", err)
+	}
 
 	printer.PrintSessionSummary(summary, time.Since(sessionStart), logPath)
 	return 0
@@ -109,7 +121,12 @@ func parseArgs(args []string) config {
 			}
 		case "--port":
 			if i+1 < len(args) {
-				fmt.Sscanf(args[i+1], "%d", &cfg.port)
+				n, err := strconv.Atoi(args[i+1])
+				if err != nil || n < 0 || n > 65535 {
+					fmt.Fprintf(os.Stderr, "Error: invalid --port value %q\n", args[i+1])
+					os.Exit(1)
+				}
+				cfg.port = n
 				i++
 			}
 		case "--quiet":
@@ -121,9 +138,6 @@ func parseArgs(args []string) config {
 				cfg.logDir = args[i+1]
 				i++
 			}
-		case "--help", "-h":
-			printUsage()
-			os.Exit(0)
 		}
 	}
 	return cfg
