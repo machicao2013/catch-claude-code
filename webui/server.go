@@ -52,7 +52,7 @@ func NewServer(mode Mode, filename string, port int) (*Server, error) {
 		port:     ln.Addr().(*net.TCPAddr).Port,
 	}
 	mux := http.NewServeMux()
-	// TODO(task2): registerRoutes will be added in handler.go
+	s.registerRoutes(mux)
 	s.httpServer = &http.Server{Handler: mux}
 	return s, nil
 }
@@ -109,4 +109,32 @@ func (s *Server) unsubscribe(ch chan []byte) {
 	s.subsMu.Lock()
 	delete(s.subs, ch)
 	s.subsMu.Unlock()
+}
+
+// registerRoutes 注册所有路由。
+func (s *Server) registerRoutes(mux *http.ServeMux) {
+	mux.HandleFunc("/api/records", s.handleRecords)
+	mux.HandleFunc("/api/stream", s.handleStream)
+	mux.HandleFunc("/api/info", s.handleInfo)
+	// 静态文件：index.html 及 /static/* 资源
+	mux.Handle("/static/", http.FileServer(http.FS(staticFS)))
+	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		data, err := staticFS.ReadFile("static/index.html")
+		if err != nil {
+			http.Error(w, "not found", 404)
+			return
+		}
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		w.Write(data)
+	})
+}
+
+// LoadFromFile 读取 JSONL 文件并填充 records（回顾模式用）。
+// loadJSONLFile 定义在同包的 handler.go 中。
+func (s *Server) LoadFromFile(path string) error {
+	return loadJSONLFile(path, func(rec recorder.Record) {
+		s.mu.Lock()
+		s.records = append(s.records, rec)
+		s.mu.Unlock()
+	})
 }
