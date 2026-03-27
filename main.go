@@ -15,6 +15,7 @@ import (
 	"claude-spy/display"
 	"claude-spy/proxy"
 	"claude-spy/recorder"
+	"claude-spy/webui"
 )
 
 type config struct {
@@ -23,6 +24,7 @@ type config struct {
 	quiet    bool
 	saveSSE  bool
 	logDir   string
+	webPort  int // 0 表示不启用 Web UI（实时模式）
 }
 
 func main() {
@@ -36,6 +38,11 @@ func run() int {
 			printUsage()
 			return 0
 		}
+	}
+
+	// 检查是否为 view 子命令
+	if len(os.Args) > 1 && os.Args[1] == "view" {
+		return runView(os.Args[2:])
 	}
 
 	args := parseArgs(os.Args[1:])
@@ -70,7 +77,21 @@ func run() int {
 	printer := display.NewPrinter(os.Stderr, args.quiet)
 	summary := display.NewSummary()
 
-	handler := proxy.NewHandler(args.upstream, rec, printer, summary, args.saveSSE, nil)
+	// 实时模式：若指定了 --web-port，启动 webui server
+	var webuiSrv *webui.Server
+	var pusher proxy.WebUIPusher
+	if args.webPort != 0 {
+		ws, err := webui.NewServer(webui.ModeLive, filepath.Base(logPath), args.webPort)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error: start web UI: %v\n", err)
+			return 1
+		}
+		webuiSrv = ws
+		pusher = ws
+		ws.Start()
+		fmt.Fprintf(os.Stderr, "[claude-spy] Web UI:  %s\n", ws.URL())
+	}
+	handler := proxy.NewHandler(args.upstream, rec, printer, summary, args.saveSSE, pusher)
 
 	srv, err := proxy.NewServer(args.port, handler)
 	if err != nil {
@@ -97,6 +118,10 @@ func run() int {
 	defer cancel()
 	if err := srv.Shutdown(shutdownCtx); err != nil {
 		fmt.Fprintf(os.Stderr, "[claude-spy] Shutdown: %v\n", err)
+	}
+
+	if webuiSrv != nil {
+		webuiSrv.Shutdown(shutdownCtx)
 	}
 
 	printer.PrintSessionSummary(summary, time.Since(sessionStart), logPath)
@@ -138,6 +163,16 @@ func parseArgs(args []string) config {
 				cfg.logDir = args[i+1]
 				i++
 			}
+		case "--web-port":
+			if i+1 < len(args) {
+				n, err := strconv.Atoi(args[i+1])
+				if err != nil || n < 0 || n > 65535 {
+					fmt.Fprintf(os.Stderr, "Error: invalid --web-port value %q\n", args[i+1])
+					os.Exit(1)
+				}
+				cfg.webPort = n
+				i++
+			}
 		}
 	}
 	return cfg
@@ -154,6 +189,51 @@ func defaultLogDir() string {
 	return filepath.Join(home, ".claude-spy", "logs")
 }
 
+func runView(args []string) int {
+	if len(args) == 0 {
+		fmt.Fprintf(os.Stderr, "Usage: claude-spy view <file.jsonl> [--port <n>]\n")
+		return 1
+	}
+	filePath := args[0]
+	port := 0 // 0 = 随机端口
+
+	for i := 1; i < len(args); i++ {
+		if args[i] == "--port" && i+1 < len(args) {
+			n, err := strconv.Atoi(args[i+1])
+			if err != nil || n < 0 || n > 65535 {
+				fmt.Fprintf(os.Stderr, "Error: invalid --port value %q\n", args[i+1])
+				return 1
+			}
+			port = n
+			i++
+		}
+	}
+
+	ws, err := webui.NewServer(webui.ModeView, filepath.Base(filePath), port)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error: start web UI: %v\n", err)
+		return 1
+	}
+	if err := ws.LoadFromFile(filePath); err != nil {
+		fmt.Fprintf(os.Stderr, "Error: load file: %v\n", err)
+		return 1
+	}
+	ws.Start()
+	fmt.Fprintf(os.Stderr, "[claude-spy] Viewing: %s\n", filePath)
+	fmt.Fprintf(os.Stderr, "[claude-spy] Web UI:  %s\n", ws.URL())
+	fmt.Fprintf(os.Stderr, "[claude-spy] Press Ctrl+C to exit\n\n")
+
+	sigCh := make(chan os.Signal, 1)
+	signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
+	<-sigCh
+	signal.Stop(sigCh)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	ws.Shutdown(ctx)
+	return 0
+}
+
 func printUsage() {
 	fmt.Fprintf(os.Stderr, `claude-spy — standalone HTTP proxy between Claude Code and the Anthropic API
 
@@ -166,7 +246,11 @@ Options:
   --quiet            Suppress per-request terminal summaries
   --save-sse         Save raw SSE events in logs
   --log-dir <dir>    Log directory (default: ~/.claude-spy/logs)
+  --web-port <n>     Start web UI on this port (live mode, alongside proxy)
   --help             Show this help
+
+Subcommands:
+  view <file.jsonl> [--port <n>]   Browse a recorded log file in the browser
 
 Example:
   claude-spy --upstream https://api.anthropic.com --port 8080
