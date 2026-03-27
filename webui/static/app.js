@@ -91,7 +91,7 @@ function renderToolUse(block) {
 function renderToolResult(block) {
   const c = block.content;
   const text = Array.isArray(c)
-    ? c.map(x => x.text || JSON.stringify(x)).join('\n')
+    ? c.map(x => x.text != null ? x.text : JSON.stringify(x)).join('\n')
     : (typeof c === 'string' ? c : JSON.stringify(c));
   return `
     <div class="msg">
@@ -108,7 +108,6 @@ function renderRecord(rec, isNew) {
 
   // 解析请求体
   const reqBody = rec.request?.body || {};
-  const messages = reqBody.messages || [];
   const respBody = rec.response?.body || {};
   const usage = respBody.usage || {};
   const stopReason = respBody.stop_reason || '—';
@@ -173,10 +172,10 @@ function toggleRecord(headerEl) {
     body.innerHTML = html;
 
     // 对超长内容启用折叠
-    body.querySelectorAll('.msg-content, .tool-param').forEach(el => {
-      const lines = parseInt(el.dataset.lines || '0', 10);
-      const threshold = el.classList.contains('tool-param') ? 5 : 10;
-      if (lines > threshold) makeCollapsible(el, threshold);
+    body.querySelectorAll('.msg-content, .tool-param').forEach(contentEl => {
+      const lines = parseInt(contentEl.dataset.lines || '0', 10);
+      const threshold = contentEl.classList.contains('tool-param') ? 5 : 10;
+      if (lines > threshold) makeCollapsible(contentEl, threshold);
     });
   }
 }
@@ -200,7 +199,9 @@ function accStats(rec) {
 // ── 主入口 ────────────────────────────────────────────────
 async function main() {
   // 1. 获取模式信息
-  const info = await fetch('/api/info').then(r => r.json());
+  const infoResp = await fetch('/api/info');
+  if (!infoResp.ok) throw new Error(`/api/info failed: ${infoResp.status}`);
+  const info = await infoResp.json();
   document.getElementById('filename').textContent = info.filename;
 
   const badge = document.getElementById('mode-badge');
@@ -214,7 +215,9 @@ async function main() {
 
   // 2. 加载已有记录
   const list = document.getElementById('records-list');
-  const records = await fetch('/api/records').then(r => r.json());
+  const recsResp = await fetch('/api/records');
+  if (!recsResp.ok) throw new Error(`/api/records failed: ${recsResp.status}`);
+  const records = await recsResp.json();
   for (const rec of (records || [])) {
     list.appendChild(renderRecord(rec, false));
     accStats(rec);
@@ -230,6 +233,11 @@ async function main() {
       accStats(rec);
       el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     });
+    es.onerror = () => {
+      const badge = document.getElementById('mode-badge');
+      badge.textContent = '连接中断';
+      badge.className = 'badge view';
+    };
   }
 }
 
