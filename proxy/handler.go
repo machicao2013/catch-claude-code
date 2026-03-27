@@ -15,6 +15,12 @@ import (
 	"claude-spy/recorder"
 )
 
+// WebUIPusher 是 webui.Server 暴露给 proxy 的最小接口。
+// 定义在 proxy 包内避免循环依赖（webui 导入 recorder，proxy 也导入 recorder）。
+type WebUIPusher interface {
+	Push(rec recorder.Record)
+}
+
 type Handler struct {
 	targetURL string
 	client    *http.Client
@@ -22,10 +28,11 @@ type Handler struct {
 	printer   *display.Printer
 	summary   *display.Summary
 	saveSSE   bool
+	webui     WebUIPusher // 可为 nil
 	reqCount  atomic.Int64
 }
 
-func NewHandler(targetURL string, rec recorder.Recorder, printer *display.Printer, summary *display.Summary, saveSSE bool) *Handler {
+func NewHandler(targetURL string, rec recorder.Recorder, printer *display.Printer, summary *display.Summary, saveSSE bool, webui WebUIPusher) *Handler {
 	return &Handler{
 		targetURL: strings.TrimRight(targetURL, "/"),
 		client:    &http.Client{Timeout: 10 * time.Minute},
@@ -33,6 +40,7 @@ func NewHandler(targetURL string, rec recorder.Recorder, printer *display.Printe
 		printer:   printer,
 		summary:   summary,
 		saveSSE:   saveSSE,
+		webui:     webui,
 	}
 }
 
@@ -273,6 +281,10 @@ func (h *Handler) recordAndSummarize(reqNum int, reqBody, respBody []byte, r *ht
 
 	if err := h.recorder.Write(rec); err != nil {
 		h.printer.PrintError(fmt.Sprintf("write record: %v", err))
+	}
+
+	if h.webui != nil {
+		h.webui.Push(rec)
 	}
 }
 

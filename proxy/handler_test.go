@@ -30,8 +30,7 @@ func TestHandler_NonMessagesPath(t *testing.T) {
 	rec := &memRecorder{}
 	printer := display.NewPrinter(io.Discard, true)
 	summary := display.NewSummary()
-	h := NewHandler(upstream.URL, rec, printer, summary, false)
-
+	h := NewHandler(upstream.URL, rec, printer, summary, false, nil)
 	req := httptest.NewRequest("GET", "/v1/models", nil)
 	rr := httptest.NewRecorder()
 	h.ServeHTTP(rr, req)
@@ -62,8 +61,7 @@ func TestHandler_MessagesNonStreaming(t *testing.T) {
 	rec := &memRecorder{}
 	printer := display.NewPrinter(io.Discard, true)
 	summary := display.NewSummary()
-	h := NewHandler(upstream.URL, rec, printer, summary, false)
-
+	h := NewHandler(upstream.URL, rec, printer, summary, false, nil)
 	body := `{"model":"claude-test","messages":[{"role":"user","content":"hi"}],"stream":false}`
 	req := httptest.NewRequest("POST", "/v1/messages", bytes.NewBufferString(body))
 	req.Header.Set("Content-Type", "application/json")

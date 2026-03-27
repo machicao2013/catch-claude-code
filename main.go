@@ -70,7 +70,7 @@ func run() int {
 	printer := display.NewPrinter(os.Stderr, args.quiet)
 	summary := display.NewSummary()
 
-	handler := proxy.NewHandler(args.upstream, rec, printer, summary, args.saveSSE)
+	handler := proxy.NewHandler(args.upstream, rec, printer, summary, args.saveSSE, nil)
 
 	srv, err := proxy.NewServer(args.port, handler)
 	if err != nil {
