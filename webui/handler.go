@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
 	"os"
 
@@ -31,10 +32,6 @@ func (s *Server) handleRecords(w http.ResponseWriter, r *http.Request) {
 	s.mu.RUnlock()
 
 	w.Header().Set("Content-Type", "application/json")
-	if len(recs) == 0 {
-		w.Write([]byte("[]"))
-		return
-	}
 	json.NewEncoder(w).Encode(recs)
 }
 
@@ -80,7 +77,8 @@ func loadJSONLFile(path string, fn func(recorder.Record)) error {
 		}
 		var rec recorder.Record
 		if err := json.Unmarshal(line, &rec); err != nil {
-			continue // 跳过损坏行
+			log.Printf("webui: skip corrupt JSONL line: %v", err)
+			continue
 		}
 		fn(rec)
 	}
