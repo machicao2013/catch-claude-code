@@ -2,6 +2,7 @@ package proxy
 
 import (
 	"bytes"
+	"compress/gzip"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -261,12 +262,12 @@ func (h *Handler) recordAndSummarize(reqNum int, reqBody, respBody []byte, r *ht
 			Method:  "POST",
 			Path:    r.URL.Path,
 			Headers: recorder.MaskHeaders(reqHeaders),
-			Body:    json.RawMessage(reqBody),
+			Body:    toRawJSON(reqBody),
 		},
 		Response: recorder.ResponseData{
 			Status:  status,
 			Headers: respH,
-			Body:    finalRespBody,
+			Body:    toRawJSON(finalRespBody),
 		},
 	}
 
@@ -296,4 +297,26 @@ func copyHeaders(dst, src http.Header) {
 			dst.Add(k, v)
 		}
 	}
+}
+
+// toRawJSON 将字节转换为合法的 json.RawMessage。
+// 如果是 gzip 压缩数据则先解压；如果仍非合法 JSON 则返回带错误描述的 JSON 字符串，避免 marshal 失败。
+func toRawJSON(data []byte) json.RawMessage {
+	// 检测 gzip 魔数 (0x1f 0x8b)
+	if len(data) >= 2 && data[0] == 0x1f && data[1] == 0x8b {
+		r, err := gzip.NewReader(bytes.NewReader(data))
+		if err == nil {
+			decompressed, err := io.ReadAll(r)
+			r.Close()
+			if err == nil {
+				data = decompressed
+			}
+		}
+	}
+	if json.Valid(data) {
+		return json.RawMessage(data)
+	}
+	// 非 JSON 内容（如二进制）存为描述字符串，保证整条记录可以正常 marshal
+	msg, _ := json.Marshal(fmt.Sprintf("<non-json body, %d bytes>", len(data)))
+	return json.RawMessage(msg)
 }
