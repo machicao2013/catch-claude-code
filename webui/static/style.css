@@ -13,6 +13,12 @@
   --result:    #64748b;
   --blue:      #60a5fa;
   --accent:    #3b82f6;
+  --surface-deep:  #0a1628;
+  --surface-hover: #253347;
+  --bg-user:       #78350f;
+  --bg-assistant:  #3b0764;
+  --bg-tool:       #14532d;
+  --bg-view-badge: #1e3a5f;
 }
 
 body {
@@ -28,7 +34,7 @@ body {
   position: sticky; top: 0; z-index: 100;
   display: flex; align-items: center; justify-content: space-between;
   padding: 10px 20px;
-  background: #0a1628;
+  background: var(--surface-deep);
   border-bottom: 1px solid var(--border);
 }
 .logo { font-weight: 700; color: var(--blue); margin-right: 12px; }
@@ -38,9 +44,9 @@ body {
   font-size: 11px; padding: 2px 8px; border-radius: 999px;
   font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em;
 }
-.badge.live { background: #14532d; color: var(--tool); }
+.badge.live { background: var(--bg-tool); color: var(--tool); }
 .badge.live::before { content: "● "; }
-.badge.view { background: #1e3a5f; color: var(--blue); }
+.badge.view { background: var(--bg-view-badge); color: var(--blue); }
 .stats { color: var(--muted); font-size: 12px; }
 
 /* ── 记录列表 ── */
@@ -57,7 +63,7 @@ body {
   user-select: none;
   transition: background 0.1s;
 }
-.record-header:hover { background: #253347; }
+.record-header:hover { background: var(--surface-hover); }
 
 .record-header-left { display: flex; align-items: center; gap: 12px; }
 .req-id { color: var(--blue); font-weight: 700; font-size: 12px; }
@@ -66,11 +72,28 @@ body {
 .req-tokens { color: var(--tool); font-size: 12px; }
 .req-stop { color: var(--muted); font-size: 11px; padding: 1px 6px; background: var(--surface2); border-radius: 4px; }
 .expand-icon { color: var(--muted); font-size: 11px; transition: transform 0.2s; }
+.record-header:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
 .record.expanded .expand-icon { transform: rotate(180deg); }
 
 /* ── 展开体 ── */
-.record-body { display: none; padding: 12px 14px; background: var(--surface2); border-top: 1px solid var(--border); }
-.record.expanded .record-body { display: block; }
+.record-body {
+  display: block;
+  overflow: hidden;
+  max-height: 0;
+  opacity: 0;
+  padding: 0 14px;
+  background: var(--surface2);
+  border-top: 1px solid var(--border);
+  transition: max-height 0.25s ease-out, opacity 0.2s ease-out, padding 0.2s ease-out;
+}
+.record.expanded .record-body {
+  max-height: 4000px;
+  opacity: 1;
+  padding: 12px 14px;
+}
 
 /* ── 消息气泡 ── */
 .msg { display: flex; gap: 8px; margin-bottom: 8px; align-items: flex-start; }
@@ -79,9 +102,9 @@ body {
   font-size: 10px; font-weight: 700; text-transform: uppercase;
   letter-spacing: 0.04em; margin-top: 2px;
 }
-.role-user     { background: #78350f; color: var(--user); }
-.role-assistant{ background: #3b0764; color: var(--assistant); }
-.role-tool-use { background: #14532d; color: var(--tool); border: 1px solid var(--tool); }
+.role-user     { background: var(--bg-user); color: var(--user); }
+.role-assistant{ background: var(--bg-assistant); color: var(--assistant); }
+.role-tool-use { background: var(--bg-tool); color: var(--tool); border: 1px solid var(--tool); }
 .role-result   { background: #1e293b; color: var(--result); }
 
 .msg-content {
