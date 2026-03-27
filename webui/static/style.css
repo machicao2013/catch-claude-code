@@ -1,0 +1,131 @@
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg:        #0f172a;
+  --surface:   #1e293b;
+  --surface2:  #0f172a;
+  --border:    #334155;
+  --text:      #e2e8f0;
+  --muted:     #94a3b8;
+  --user:      #f59e0b;
+  --assistant: #a78bfa;
+  --tool:      #4ade80;
+  --result:    #64748b;
+  --blue:      #60a5fa;
+  --accent:    #3b82f6;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: ui-monospace, "SFMono-Regular", Menlo, monospace;
+  font-size: 13px;
+  min-height: 100vh;
+}
+
+/* ── 顶栏 ── */
+#topbar {
+  position: sticky; top: 0; z-index: 100;
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 10px 20px;
+  background: #0a1628;
+  border-bottom: 1px solid var(--border);
+}
+.logo { font-weight: 700; color: var(--blue); margin-right: 12px; }
+.filename { color: var(--muted); font-size: 12px; }
+.topbar-right { display: flex; align-items: center; gap: 16px; }
+.badge {
+  font-size: 11px; padding: 2px 8px; border-radius: 999px;
+  font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em;
+}
+.badge.live { background: #14532d; color: var(--tool); }
+.badge.live::before { content: "● "; }
+.badge.view { background: #1e3a5f; color: var(--blue); }
+.stats { color: var(--muted); font-size: 12px; }
+
+/* ── 记录列表 ── */
+#records-list { padding: 16px 20px; max-width: 960px; margin: 0 auto; }
+
+/* ── 单条记录 ── */
+.record { margin-bottom: 10px; border-radius: 8px; overflow: hidden; border: 1px solid var(--border); }
+
+.record-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 10px 14px;
+  background: var(--surface);
+  cursor: pointer;
+  user-select: none;
+  transition: background 0.1s;
+}
+.record-header:hover { background: #253347; }
+
+.record-header-left { display: flex; align-items: center; gap: 12px; }
+.req-id { color: var(--blue); font-weight: 700; font-size: 12px; }
+.req-time { color: var(--muted); font-size: 12px; }
+.req-duration { color: var(--text); font-size: 12px; }
+.req-tokens { color: var(--tool); font-size: 12px; }
+.req-stop { color: var(--muted); font-size: 11px; padding: 1px 6px; background: var(--surface2); border-radius: 4px; }
+.expand-icon { color: var(--muted); font-size: 11px; transition: transform 0.2s; }
+.record.expanded .expand-icon { transform: rotate(180deg); }
+
+/* ── 展开体 ── */
+.record-body { display: none; padding: 12px 14px; background: var(--surface2); border-top: 1px solid var(--border); }
+.record.expanded .record-body { display: block; }
+
+/* ── 消息气泡 ── */
+.msg { display: flex; gap: 8px; margin-bottom: 8px; align-items: flex-start; }
+.role-tag {
+  flex-shrink: 0; padding: 2px 7px; border-radius: 4px;
+  font-size: 10px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: 0.04em; margin-top: 2px;
+}
+.role-user     { background: #78350f; color: var(--user); }
+.role-assistant{ background: #3b0764; color: var(--assistant); }
+.role-tool-use { background: #14532d; color: var(--tool); border: 1px solid var(--tool); }
+.role-result   { background: #1e293b; color: var(--result); }
+
+.msg-content {
+  flex: 1; background: var(--surface); border-radius: 6px;
+  padding: 7px 10px; font-size: 12px; line-height: 1.5;
+  word-break: break-word; white-space: pre-wrap;
+}
+.msg-content.tool-use-content { border: 1px solid #166534; }
+.tool-name { color: var(--tool); font-weight: 700; margin-bottom: 4px; font-size: 12px; }
+.tool-param { color: var(--muted); font-size: 11px; }
+.tool-param span { color: var(--text); }
+
+/* ── 长内容折叠 ── */
+.collapsible { position: relative; }
+.collapsible.collapsed .collapsible-inner {
+  max-height: 80px; overflow: hidden;
+}
+.collapsible.collapsed .collapsible-inner::after {
+  content: "";
+  position: absolute; bottom: 0; left: 0; right: 0;
+  height: 32px;
+  background: linear-gradient(transparent, var(--surface));
+}
+.toggle-btn {
+  display: inline-block; margin-top: 4px;
+  color: var(--blue); font-size: 11px; cursor: pointer; text-decoration: underline;
+}
+
+/* ── 响应区 ── */
+.response-footer {
+  margin-top: 10px; padding: 8px 10px;
+  background: var(--surface); border-radius: 6px; border-left: 3px solid var(--blue);
+  font-size: 11px; color: var(--muted);
+  display: flex; gap: 16px; flex-wrap: wrap;
+}
+.response-footer .label { color: var(--muted); }
+.response-footer .val   { color: var(--text); }
+.response-footer .tok-in   { color: var(--blue); }
+.response-footer .tok-out  { color: var(--tool); }
+.response-footer .tok-cache{ color: var(--user); }
+
+/* ── 滑入动画（实时模式新记录） ── */
+@keyframes slideIn {
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.record.new { animation: slideIn 0.25s ease-out; }
