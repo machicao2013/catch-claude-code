@@ -4,54 +4,52 @@ import (
 	"context"
 	"crypto/rand"
 	"fmt"
+	"net/url"
 	"os"
+	"os/signal"
 	"path/filepath"
+	"syscall"
 	"time"
 
 	"claude-spy/display"
-	"claude-spy/launcher"
 	"claude-spy/proxy"
 	"claude-spy/recorder"
 )
+
+type config struct {
+	upstream string
+	port     int
+	quiet    bool
+	saveSSE  bool
+	logDir   string
+}
 
 func main() {
 	os.Exit(run())
 }
 
 func run() int {
-	spyArgs, claudeArgs := splitArgs(os.Args[1:])
+	args := parseArgs(os.Args[1:])
 
-	port := 0
-	quiet := false
-	saveSSE := false
-	logDir := defaultLogDir()
-
-	for i := 0; i < len(spyArgs); i++ {
-		switch spyArgs[i] {
-		case "--port":
-			if i+1 < len(spyArgs) {
-				fmt.Sscanf(spyArgs[i+1], "%d", &port)
-				i++
-			}
-		case "--quiet":
-			quiet = true
-		case "--save-sse":
-			saveSSE = true
-		case "--log-dir":
-			if i+1 < len(spyArgs) {
-				logDir = spyArgs[i+1]
-				i++
-			}
-		case "--help", "-h":
-			printUsage()
-			return 0
-		}
+	// --upstream 必填，且须为合法 URL（有 scheme 和 host）
+	if args.upstream == "" {
+		fmt.Fprintf(os.Stderr, "Error: --upstream is required (or set CLAUDE_SPY_UPSTREAM)\n")
+		printUsage()
+		return 1
+	}
+	if u, err := url.Parse(args.upstream); err != nil || u.Scheme == "" || u.Host == "" {
+		fmt.Fprintf(os.Stderr, "Error: --upstream must be a valid URL with scheme and host, e.g. https://api.anthropic.com\n")
+		return 1
 	}
 
 	sessionID := generateSessionID()
-	logPath := filepath.Join(logDir, sessionID+".jsonl")
+	logPath := filepath.Join(args.logDir, sessionID+".jsonl")
 
-	printer := display.NewPrinter(os.Stderr, quiet)
+	// 创建日志目录
+	if err := os.MkdirAll(args.logDir, 0755); err != nil {
+		fmt.Fprintf(os.Stderr, "Error: create log dir: %v\n", err)
+		return 1
+	}
 
 	rec, err := recorder.NewJSONLWriter(logPath)
 	if err != nil {
@@ -60,88 +58,75 @@ func run() int {
 	}
 	defer rec.Close()
 
+	printer := display.NewPrinter(os.Stderr, args.quiet)
 	summary := display.NewSummary()
 
-	// Find claude binary and extract the real API URL from it
-	claudePath := launcher.FindClaude()
-	if claudePath == "" {
-		fmt.Fprintf(os.Stderr, "Error: claude-internal not found\n")
+	handler := proxy.NewHandler(args.upstream, rec, printer, summary, args.saveSSE)
+
+	srv, err := proxy.NewServer(args.port, handler)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error: could not start proxy server: %v\n", err)
 		return 1
-	}
-
-	upstreamURL := os.Getenv("CLAUDE_SPY_UPSTREAM")
-	if upstreamURL == "" {
-		upstreamURL = launcher.ExtractUpstreamURL(claudePath)
-	}
-	if upstreamURL == "" {
-		fmt.Fprintf(os.Stderr, "Error: cannot determine API URL. Set CLAUDE_SPY_UPSTREAM\n")
-		return 1
-	}
-
-	if !quiet {
-		fmt.Fprintf(os.Stderr, "[claude-spy] Upstream API: %s\n", upstreamURL)
-	}
-
-	// Start the proxy server
-	handler := proxy.NewHandler(upstreamURL, rec, printer, summary, saveSSE)
-
-	var srv *proxy.Server
-	maxRetries := 3
-	for i := 0; i < maxRetries; i++ {
-		srv, err = proxy.NewServer(port, handler)
-		if err == nil {
-			break
-		}
-		if i == maxRetries-1 {
-			fmt.Fprintf(os.Stderr, "Error: could not start proxy server: %v\n", err)
-			return 1
-		}
-		port = 0
 	}
 	srv.Start()
-	defer srv.Shutdown(context.Background())
+	sessionStart := time.Now() // 记录 session 开始时间，用于退出时统计
 
-	if !quiet {
-		fmt.Fprintf(os.Stderr, "[claude-spy] Proxy listening on %s\n", srv.BaseURL())
-		fmt.Fprintf(os.Stderr, "[claude-spy] Logging to %s\n", logPath)
-	}
+	// 启动信息始终打印（--quiet 只抑制实时摘要）
+	fmt.Fprintf(os.Stderr, "[claude-spy] Upstream API:  %s\n", args.upstream)
+	fmt.Fprintf(os.Stderr, "[claude-spy] Proxy listening on http://0.0.0.0:%d\n", srv.Port())
+	fmt.Fprintf(os.Stderr, "[claude-spy] Set ANTHROPIC_BASE_URL=http://<your-ip>:%d\n", srv.Port())
+	fmt.Fprintf(os.Stderr, "[claude-spy] Logging to %s\n\n", logPath)
 
-	// Create a patched copy of claude-internal with the API URL pointing to our proxy.
-	// claude-internal hardcodes the gateway URL and overrides ANTHROPIC_BASE_URL at startup,
-	// so setting env vars doesn't work. We binary-patch the URL instead.
-	proxyURL := srv.BaseURL()
-	patchedPath, err := launcher.PatchBinary(claudePath, upstreamURL, proxyURL)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error: patch binary: %v\n", err)
-		return 1
-	}
-	defer os.Remove(patchedPath)
+	// 等待退出信号
+	sigCh := make(chan os.Signal, 1)
+	signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
+	<-sigCh
 
-	if !quiet {
-		fmt.Fprintf(os.Stderr, "[claude-spy] Patched binary: %s\n\n", patchedPath)
-	}
-
-	// Launch the patched claude-internal
-	env := os.Environ()
-	sessionStart := time.Now()
-	exitCode, err := launcher.Launch(patchedPath, claudeArgs, env)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-		return 1
-	}
+	// 优雅关闭，10s 超时
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	srv.Shutdown(shutdownCtx)
 
 	printer.PrintSessionSummary(summary, time.Since(sessionStart), logPath)
-
-	return exitCode
+	return 0
 }
 
-func splitArgs(args []string) (spyArgs, claudeArgs []string) {
-	for i, a := range args {
-		if a == "--" {
-			return args[:i], args[i+1:]
+func parseArgs(args []string) config {
+	cfg := config{
+		port:   8080,
+		logDir: defaultLogDir(),
+	}
+
+	// 优先从环境变量读取 upstream
+	cfg.upstream = os.Getenv("CLAUDE_SPY_UPSTREAM")
+
+	for i := 0; i < len(args); i++ {
+		switch args[i] {
+		case "--upstream":
+			if i+1 < len(args) {
+				cfg.upstream = args[i+1]
+				i++
+			}
+		case "--port":
+			if i+1 < len(args) {
+				fmt.Sscanf(args[i+1], "%d", &cfg.port)
+				i++
+			}
+		case "--quiet":
+			cfg.quiet = true
+		case "--save-sse":
+			cfg.saveSSE = true
+		case "--log-dir":
+			if i+1 < len(args) {
+				cfg.logDir = args[i+1]
+				i++
+			}
+		case "--help", "-h":
+			printUsage()
+			os.Exit(0)
 		}
 	}
-	return nil, args
+	return cfg
 }
 
 func generateSessionID() string {
@@ -156,21 +141,21 @@ func defaultLogDir() string {
 }
 
 func printUsage() {
-	fmt.Fprintf(os.Stderr, `claude-spy — intercept and log Claude Code API interactions
+	fmt.Fprintf(os.Stderr, `claude-spy — standalone HTTP proxy between Claude Code and the Anthropic API
 
 Usage:
-  claude-spy [spy-options] [--] [claude-options...]
+  claude-spy --upstream <url> [options]
 
-Spy Options:
-  --port <n>       Proxy port (default: auto)
-  --quiet          Suppress terminal summaries
-  --save-sse       Save raw SSE events in logs
-  --log-dir <dir>  Log directory (default: ~/.claude-spy/logs)
-  --help           Show this help
+Options:
+  --upstream <url>   Upstream API base URL (required, or set CLAUDE_SPY_UPSTREAM)
+  --port <n>         Proxy listen port (default: 8080)
+  --quiet            Suppress per-request terminal summaries
+  --save-sse         Save raw SSE events in logs
+  --log-dir <dir>    Log directory (default: ~/.claude-spy/logs)
+  --help             Show this help
 
-Examples:
-  claude-spy                      # Normal usage
-  claude-spy --continue           # Continue last session
-  claude-spy --quiet -- -p "hi"   # Quiet mode, print mode
+Example:
+  claude-spy --upstream https://api.anthropic.com --port 8080
+  ANTHROPIC_BASE_URL=http://<this-host>:8080 claude  # on the client machine
 `)
 }
