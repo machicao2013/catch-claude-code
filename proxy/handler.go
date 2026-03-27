@@ -164,14 +164,18 @@ func (h *Handler) printReqSummary(reqNum int, reqBody []byte) {
 
 	msgCounts := map[string]int{}
 	for _, m := range parsed.Messages {
-		var msg struct{ Role string `json:"role"` }
+		var msg struct {
+			Role string `json:"role"`
+		}
 		json.Unmarshal(m, &msg)
 		msgCounts[msg.Role]++
 	}
 
 	var toolNames []string
 	for _, t := range parsed.Tools {
-		var tool struct{ Name string `json:"name"` }
+		var tool struct {
+			Name string `json:"name"`
+		}
 		json.Unmarshal(t, &tool)
 		if tool.Name != "" {
 			toolNames = append(toolNames, tool.Name)

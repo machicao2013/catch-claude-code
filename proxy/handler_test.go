@@ -17,8 +17,8 @@ type memRecorder struct {
 }
 
 func (m *memRecorder) Write(r recorder.Record) error { m.records = append(m.records, r); return nil }
-func (m *memRecorder) Close() error                   { return nil }
-func (m *memRecorder) FilePath() string               { return "test.jsonl" }
+func (m *memRecorder) Close() error                  { return nil }
+func (m *memRecorder) FilePath() string              { return "test.jsonl" }
 
 func TestHandler_NonMessagesPath(t *testing.T) {
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
