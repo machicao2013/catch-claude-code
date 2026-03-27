@@ -121,7 +121,11 @@ func run() int {
 	}
 
 	if webuiSrv != nil {
-		webuiSrv.Shutdown(shutdownCtx)
+		webuiCtx, webuiCancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer webuiCancel()
+		if err := webuiSrv.Shutdown(webuiCtx); err != nil {
+			fmt.Fprintf(os.Stderr, "[claude-spy] WebUI Shutdown: %v\n", err)
+		}
 	}
 
 	printer.PrintSessionSummary(summary, time.Since(sessionStart), logPath)
@@ -216,6 +220,9 @@ func runView(args []string) int {
 	}
 	if err := ws.LoadFromFile(filePath); err != nil {
 		fmt.Fprintf(os.Stderr, "Error: load file: %v\n", err)
+		cleanupCtx, cleanupCancel := context.WithTimeout(context.Background(), 1*time.Second)
+		defer cleanupCancel()
+		ws.Shutdown(cleanupCtx)
 		return 1
 	}
 	ws.Start()
