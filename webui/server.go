@@ -78,7 +78,10 @@ func (s *Server) Push(rec recorder.Record) {
 	s.records = append(s.records, rec)
 	s.mu.Unlock()
 
-	data, _ := json.Marshal(rec)
+	data, err := json.Marshal(rec)
+	if err != nil {
+		return // 序列化失败时不广播
+	}
 	msg := []byte("event: record\ndata: " + string(data) + "\n\n")
 	s.broadcast(msg)
 }
