@@ -250,10 +250,17 @@ function renderToolResult(block) {
 }
 
 function renderThinking(text) {
+  if (!text) {
+    return `
+    <div class="msg">
+      <span class="role-tag role-thinking">think</span>
+      <div class="msg-content thinking-content" style="opacity:0.5;font-style:italic;">（无内容）</div>
+    </div>`;
+  }
   return `
     <div class="msg">
       <span class="role-tag role-thinking">think</span>
-      <div class="msg-content thinking-content" data-lines="${(text || '').split('\n').length}">${escHtml(text || '')}</div>
+      <div class="msg-content thinking-content" data-lines="${text.split('\n').length}">${escHtml(text)}</div>
     </div>`;
 }
 
@@ -346,8 +353,8 @@ function renderRecordBody(body, rec, summary) {
 
   if (messages.length > 0) {
     reqHtml += `<div class="messages-list">`;
-    for (const msg of messages) {
-      reqHtml += renderMessage(msg);
+    for (let i = 0; i < messages.length; i++) {
+      reqHtml += `<div class="msg-numbered"><span class="msg-index">${i}</span>${renderMessage(messages[i])}</div>`;
     }
     reqHtml += `</div>`;
   }
