@@ -29,8 +29,8 @@ function escHtml(s) {
 
 // ── Theme System ──────────────────────────────────────────────
 
-const THEMES = ['obsidian', 'daylight', 'phosphor'];
-const THEME_ICONS = { obsidian: '🌙', daylight: '☀️', phosphor: '⚡' };
+const THEMES = ['obsidian', 'daylight', 'claude', 'phosphor'];
+const THEME_ICONS = { obsidian: '🌙', daylight: '☀️', claude: '🧡', phosphor: '⚡' };
 
 function getTheme() {
   return document.documentElement.getAttribute('data-theme') || 'obsidian';

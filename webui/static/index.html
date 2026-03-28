@@ -12,7 +12,7 @@
     // 在 CSS 加载前设置主题，防止闪烁
     (function(){
       var t = localStorage.getItem('claude-spy-theme');
-      if (t && ['obsidian','daylight','phosphor'].includes(t)) {
+      if (t && ['obsidian','daylight','claude','phosphor'].includes(t)) {
         document.documentElement.setAttribute('data-theme', t);
       }
     })();

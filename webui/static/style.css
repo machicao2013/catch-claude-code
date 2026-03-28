@@ -186,6 +186,67 @@
   --transition-norm: 0.15s linear;
 }
 
+/* ═══════════════ THEME: CLAUDE ═══════════════ */
+/* Based on Anthropic's brand: warm terracotta (#DA7756), cream bg, refined warmth */
+[data-theme="claude"] {
+  --bg:              #faf6f0;
+  --bg-deep:         #f3ede4;
+  --surface:         #ffffff;
+  --surface-hover:   #f7f2ea;
+  --surface-alt:     #faf8f4;
+  --border:          #e5ddd2;
+  --border-subtle:   #efe9e0;
+  --border-accent:   #d4c8b8;
+
+  --text:            #2d2418;
+  --text-secondary:  #6b5c4a;
+  --text-muted:      #a89880;
+
+  --accent-blue:     #DA7756;    /* Claude terracotta as primary accent */
+  --accent-green:    #2b8a60;
+  --accent-purple:   #8b5cf6;
+  --accent-amber:    #c2850e;
+  --accent-red:      #c53030;
+  --accent-cyan:     #DA7756;
+
+  --role-user-bg:    rgba(218,119,86,0.1);
+  --role-user-text:  #b85a3a;
+  --role-asst-bg:    rgba(139,92,246,0.07);
+  --role-asst-text:  #6d28d9;
+  --role-tool-bg:    rgba(43,138,96,0.06);
+  --role-tool-text:  #1a6b45;
+  --role-tool-border:rgba(43,138,96,0.2);
+  --role-result-bg:  rgba(107,92,74,0.05);
+  --role-result-text:#7a6a55;
+  --role-think-bg:   rgba(139,92,246,0.04);
+  --role-think-text: #7c3aed;
+  --role-think-border:rgba(139,92,246,0.15);
+
+  --error-bg:        rgba(197,48,48,0.04);
+  --error-border:    rgba(197,48,48,0.15);
+  --error-text:      #9b1c1c;
+  --error-accent:    #c53030;
+
+  --status-ok:       #2b8a60;
+  --status-err:      #c53030;
+
+  --badge-live-bg:   rgba(43,138,96,0.1);
+  --badge-live-text: #1a6b45;
+  --badge-view-bg:   rgba(218,119,86,0.1);
+  --badge-view-text: #DA7756;
+
+  --shadow-sm:       0 1px 2px rgba(45,36,24,0.06);
+  --shadow-md:       0 2px 10px rgba(45,36,24,0.08);
+  --shadow-lg:       0 4px 20px rgba(45,36,24,0.1);
+  --shadow-glow-blue:0 0 12px rgba(218,119,86,0.08);
+
+  --radius-sm:       4px;
+  --radius-md:       8px;
+  --radius-lg:       12px;
+  --transition-fast: 0.12s cubic-bezier(0.4,0,0.2,1);
+  --transition-norm: 0.25s cubic-bezier(0.4,0,0.2,1);
+}
+
 /* ═══════════════ BASE ═══════════════ */
 body {
   background: var(--bg);
@@ -620,6 +681,21 @@ body {
 [data-theme="phosphor"] .toggle-btn:hover {
   text-shadow: 0 0 4px rgba(32,238,32,0.4);
 }
+
+/* ═══════════════ CLAUDE THEME: WARM ACCENTS ═══════════════ */
+[data-theme="claude"] .logo {
+  color: #DA7756;
+}
+[data-theme="claude"] .search-bar:focus-within {
+  border-color: #DA7756;
+  box-shadow: 0 0 0 1px #DA7756, 0 0 12px rgba(218,119,86,0.08);
+}
+[data-theme="claude"] .record:hover { border-color: #d4c8b8; }
+[data-theme="claude"] .record.focused { border-color: #DA7756; box-shadow: 0 0 0 1px #DA7756; }
+[data-theme="claude"] .section-request { color: #DA7756; border-bottom-color: #DA7756; }
+[data-theme="claude"] .req-id { color: #DA7756; }
+[data-theme="claude"] .record:hover .expand-icon { color: #DA7756; }
+[data-theme="claude"] ::selection { background: #DA7756; color: #fff; }
 
 /* ═══════════════ KEYBOARD HINT ═══════════════ */
 .kbd-hint {
