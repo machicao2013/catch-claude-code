@@ -119,18 +119,24 @@ body {
 
 /* ── 长内容折叠 ── */
 .collapsible { position: relative; }
+.collapsible-inner {
+  overflow: visible;
+}
 .collapsible.collapsed .collapsible-inner {
   max-height: 80px; overflow: hidden;
+  position: relative;
 }
 .collapsible.collapsed .collapsible-inner::after {
   content: "";
   position: absolute; bottom: 0; left: 0; right: 0;
   height: 32px;
   background: linear-gradient(transparent, var(--surface));
+  pointer-events: none;
 }
 .toggle-btn {
   display: inline-block; margin-top: 4px;
   color: var(--blue); font-size: 11px; cursor: pointer; text-decoration: underline;
+  position: relative; z-index: 1;
 }
 
 /* ── 响应区 ── */
