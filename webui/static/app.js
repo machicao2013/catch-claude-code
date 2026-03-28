@@ -71,6 +71,7 @@ function setupSearch() {
 function filterRecords(query, countEl) {
   const q = query.toLowerCase().trim();
   const records = document.querySelectorAll('.record');
+  const groupHeaders = document.querySelectorAll('.group-header');
   let visible = 0, total = records.length;
   records.forEach(el => {
     if (!q) {
@@ -81,12 +82,20 @@ function filterRecords(query, countEl) {
     const s = el._summary;
     const haystack = [s.id, s.model || '', s.stop_reason || ''].join(' ').toLowerCase();
     const isError = !s.stop_reason && s.out_tokens === 0;
-    const match = haystack.includes(q) || (q === 'error' && isError) || (q === 'err' && isError);
+    const type = classifyRecord(s);
+    const match = haystack.includes(q)
+      || (q === 'error' && isError)
+      || (q === 'err' && isError)
+      || (q === 'sub' && type === 'sub')
+      || (q === 'main' && type === 'main')
+      || (q === '主对话' && type === 'main')
+      || (q === '子请求' && type === 'sub');
     el.classList.toggle('hidden', !match);
     if (match) visible++;
   });
+  // Hide group headers when filtering
+  groupHeaders.forEach(h => h.classList.toggle('hidden', !!q));
   countEl.textContent = q ? `${visible}/${total}` : '';
-  // Reset focus index after filter
   currentFocusIndex = -1;
 }
 
@@ -278,7 +287,8 @@ function renderRedacted() {
 function renderSummaryRecord(summary, isNew) {
   const el = document.createElement('div');
   const isError = !summary.stop_reason && summary.out_tokens === 0;
-  el.className = 'record' + (isNew ? ' new' : '') + (isError ? ' has-error' : '');
+  const isSub = classifyRecord(summary) === 'sub';
+  el.className = 'record' + (isNew ? ' new' : '') + (isError ? ' has-error' : '') + (isSub ? ' is-sub' : '');
   el.dataset.id = summary.id;
 
   const timeStr = fmtTime(summary.timestamp);
@@ -452,6 +462,56 @@ function renderRecordBody(body, rec, summary) {
   });
 }
 
+// ── Record Grouping (对话 vs 子请求) ─────────────────────────
+
+const SYS_LEN_THRESHOLD = 5000; // system prompt > 5000 chars = 主对话
+
+function classifyRecord(s) {
+  // 主对话：有长 system prompt（完整的 Claude Code 指令）
+  // 子请求：短 system prompt（工具内部调用、摘要等）
+  return s.sys_len > SYS_LEN_THRESHOLD ? 'main' : 'sub';
+}
+
+function groupRecords(summaries) {
+  const groups = [];
+  let currentGroup = null;
+
+  for (const s of summaries) {
+    const type = classifyRecord(s);
+
+    if (!currentGroup || currentGroup.type !== type) {
+      // 开始新组
+      currentGroup = {
+        type,
+        records: [s],
+        startTime: s.timestamp,
+        startId: s.id,
+      };
+      groups.push(currentGroup);
+    } else {
+      currentGroup.records.push(s);
+    }
+  }
+
+  return groups;
+}
+
+function renderGroupHeader(group) {
+  const el = document.createElement('div');
+  el.className = `group-header group-${group.type}`;
+
+  const count = group.records.length;
+  const timeStr = fmtTime(group.startTime);
+
+  if (group.type === 'main') {
+    el.innerHTML = `<span class="group-icon">💬</span> <span class="group-title">主对话</span> <span class="group-meta">${count} 次请求 · 起始 ${timeStr}</span>`;
+  } else {
+    el.innerHTML = `<span class="group-icon">⚡</span> <span class="group-title">子请求</span> <span class="group-meta">${count} 次 · 起始 ${timeStr} · 工具调用 / 摘要等内部请求</span>`;
+  }
+
+  return el;
+}
+
 // ── Stats ─────────────────────────────────────────────────────
 
 let totalReqs = 0, totalIn = 0, totalOut = 0;
@@ -505,9 +565,13 @@ async function main() {
   if (!summaries || summaries.length === 0) {
     list.innerHTML = '<div class="empty-state"><div class="emoji">📋</div>暂无记录</div>';
   } else {
-    for (const s of summaries) {
-      list.appendChild(renderSummaryRecord(s, false));
-      accStatsSummary(s);
+    const groups = groupRecords(summaries);
+    for (const group of groups) {
+      list.appendChild(renderGroupHeader(group));
+      for (const s of group.records) {
+        list.appendChild(renderSummaryRecord(s, false));
+        accStatsSummary(s);
+      }
     }
   }
 
@@ -522,6 +586,7 @@ async function main() {
         duration_ms: rec.duration_ms,
         model: rec.request?.body?.model || '',
         msg_count: rec.request?.body?.messages?.length || 0,
+        sys_len: JSON.stringify(rec.request?.body?.system || '').length,
         stop_reason: rec.response?.body?.stop_reason || '',
         in_tokens: rec.response?.body?.usage?.input_tokens || 0,
         out_tokens: rec.response?.body?.usage?.output_tokens || 0,

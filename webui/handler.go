@@ -24,16 +24,17 @@ type InfoResponse struct {
 
 // RecordSummary 是记录的摘要信息（不含完整 request/response body）。
 type RecordSummary struct {
-	ID         string `json:"id"`
-	Timestamp  string `json:"timestamp"`
-	DurationMs int64  `json:"duration_ms"`
-	Model      string `json:"model"`
-	MsgCount   int    `json:"msg_count"`
-	StopReason string `json:"stop_reason"`
-	InTokens   int64  `json:"in_tokens"`
-	OutTokens  int64  `json:"out_tokens"`
-	CacheRead  int64  `json:"cache_read"`
-	CacheCreate int64 `json:"cache_create"`
+	ID          string `json:"id"`
+	Timestamp   string `json:"timestamp"`
+	DurationMs  int64  `json:"duration_ms"`
+	Model       string `json:"model"`
+	MsgCount    int    `json:"msg_count"`
+	SysLen      int    `json:"sys_len"`
+	StopReason  string `json:"stop_reason"`
+	InTokens    int64  `json:"in_tokens"`
+	OutTokens   int64  `json:"out_tokens"`
+	CacheRead   int64  `json:"cache_read"`
+	CacheCreate int64  `json:"cache_create"`
 }
 
 func extractSummary(rec recorder.Record) RecordSummary {
@@ -43,14 +44,16 @@ func extractSummary(rec recorder.Record) RecordSummary {
 		DurationMs: rec.DurationMs,
 	}
 
-	// 从 request body 提取 model 和 message count
+	// 从 request body 提取 model、message count、system prompt 长度
 	var reqBody struct {
 		Model    string            `json:"model"`
 		Messages []json.RawMessage `json:"messages"`
+		System   json.RawMessage   `json:"system"`
 	}
 	json.Unmarshal(rec.Request.Body, &reqBody)
 	s.Model = reqBody.Model
 	s.MsgCount = len(reqBody.Messages)
+	s.SysLen = len(reqBody.System)
 
 	// 从 response body 提取 usage 和 stop_reason
 	var respBody struct {

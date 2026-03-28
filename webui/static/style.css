@@ -258,6 +258,32 @@ body {
   max-width: 1600px; margin: 0 auto;
 }
 
+/* ── Record Groups ─────────────────────────────────────────── */
+.group-header {
+  display: flex; align-items: center; gap: 8px;
+  padding: 8px 14px; margin: 16px 0 6px 0;
+  font-size: 12px; font-weight: 700;
+  border-radius: var(--radius-sm);
+}
+.group-header:first-child { margin-top: 0; }
+.group-header.hidden { display: none; }
+.group-icon { font-size: 14px; }
+.group-title { color: var(--text); }
+.group-meta { color: var(--text-muted); font-weight: 400; font-size: 11px; }
+
+.group-main {
+  background: var(--surface);
+  border-left: 3px solid var(--accent-blue);
+}
+.group-sub {
+  background: var(--surface-alt);
+  border-left: 3px solid var(--accent-amber);
+  opacity: 0.85;
+}
+
+/* Sub-request records slightly dimmed */
+.group-sub ~ .record:not(.group-header ~ .group-main ~ .record) { }
+
 /* ── Record Card ───────────────────────────────────────────── */
 .record {
   margin-bottom: 6px;
@@ -274,6 +300,11 @@ body {
 /* Error records */
 .record.has-error { border-left: 3px solid var(--accent-red); }
 .record.has-error .record-header { background: var(--error-bg); }
+
+/* Sub-request records dimmed */
+.record.is-sub { opacity: 0.7; }
+.record.is-sub:hover { opacity: 1; }
+.record.is-sub .req-id::after { content: ' ⚡'; font-size: 9px; }
 
 .record-header {
   display: flex; align-items: center; justify-content: space-between;
