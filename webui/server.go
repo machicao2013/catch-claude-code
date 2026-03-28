@@ -6,7 +6,9 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"strings"
 	"sync"
+	"time"
 
 	"claude-spy/recorder"
 )
@@ -125,8 +127,12 @@ func (s *Server) registerRoutes(mux *http.ServeMux) {
 			http.Error(w, "not found", 404)
 			return
 		}
+		// 注入动态版本号，打破浏览器/反代缓存
+		ver := fmt.Sprintf("%d", time.Now().UnixMilli())
+		html := strings.ReplaceAll(string(data), "?v=2", "?v="+ver)
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
-		w.Write(data)
+		w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate")
+		w.Write([]byte(html))
 	})
 }
 

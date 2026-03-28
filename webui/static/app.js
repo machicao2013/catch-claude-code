@@ -60,6 +60,10 @@ function renderMessage(msg) {
       frags.push(renderToolUse(block));
     } else if (block.type === 'tool_result') {
       frags.push(renderToolResult(block));
+    } else if (block.type === 'thinking') {
+      frags.push(renderThinking(block.thinking || ''));
+    } else if (block.type === 'redacted_thinking') {
+      frags.push(renderThinking('[redacted]'));
     } else {
       frags.push(renderTextMsg(role, JSON.stringify(block)));
     }
