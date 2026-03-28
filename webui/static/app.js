@@ -199,7 +199,7 @@ function accStats(rec) {
 // ── 主入口 ────────────────────────────────────────────────
 async function main() {
   // 1. 获取模式信息
-  const infoResp = await fetch('/api/info');
+  const infoResp = await fetch('api/info');
   if (!infoResp.ok) throw new Error(`/api/info failed: ${infoResp.status}`);
   const info = await infoResp.json();
   document.getElementById('filename').textContent = info.filename;
@@ -215,7 +215,7 @@ async function main() {
 
   // 2. 加载已有记录
   const list = document.getElementById('records-list');
-  const recsResp = await fetch('/api/records');
+  const recsResp = await fetch('api/records');
   if (!recsResp.ok) throw new Error(`/api/records failed: ${recsResp.status}`);
   const records = await recsResp.json();
   for (const rec of (records || [])) {
@@ -225,7 +225,7 @@ async function main() {
 
   // 3. 实时模式：连接 SSE
   if (info.mode === 'live') {
-    const es = new EventSource('/api/stream');
+    const es = new EventSource('api/stream');
     es.addEventListener('record', e => {
       const rec = JSON.parse(e.data);
       const el = renderRecord(rec, true);
