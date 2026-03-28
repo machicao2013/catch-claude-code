@@ -462,6 +462,28 @@ function renderRecordBody(body, rec, summary) {
   });
 }
 
+// ── Sub-request Toggle ───────────────────────────────────────
+
+let showSubRequests = true;
+
+function setupSubToggle() {
+  const btn = document.getElementById('sub-toggle');
+  btn.addEventListener('click', () => {
+    showSubRequests = !showSubRequests;
+    btn.classList.toggle('active', showSubRequests);
+    applySubFilter();
+  });
+}
+
+function applySubFilter() {
+  document.querySelectorAll('.record.is-sub').forEach(el => {
+    el.classList.toggle('hidden-sub', !showSubRequests);
+  });
+  document.querySelectorAll('.group-sub').forEach(el => {
+    el.classList.toggle('hidden-sub', !showSubRequests);
+  });
+}
+
 // ── Record Grouping (对话 vs 子请求) ─────────────────────────
 
 const SYS_LEN_THRESHOLD = 5000; // system prompt > 5000 chars = 主对话
@@ -537,9 +559,10 @@ async function main() {
   // Theme toggle click
   document.getElementById('theme-toggle').addEventListener('click', cycleTheme);
 
-  // Setup search & keyboard
+  // Setup search, keyboard, sub-toggle
   setupSearch();
   setupKeyboard();
+  setupSubToggle();
 
   // 1. Fetch info
   const infoResp = await fetch('api/info');

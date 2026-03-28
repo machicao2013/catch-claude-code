@@ -242,6 +242,20 @@ body {
 .search-bar input::placeholder { color: var(--text-muted); }
 .search-count { color: var(--text-muted); font-size: 11px; white-space: nowrap; }
 
+/* ── Filter Toggle Button ──────────────────────────────────── */
+.filter-btn {
+  background: var(--surface); border: 1px solid var(--border);
+  color: var(--text-muted); font-size: 11px; font-family: inherit;
+  padding: 3px 10px; border-radius: var(--radius-sm);
+  cursor: pointer; transition: all var(--transition-fast);
+  white-space: nowrap;
+}
+.filter-btn:hover { border-color: var(--accent-amber); color: var(--text); }
+.filter-btn.active {
+  background: var(--accent-amber); color: var(--bg-deep);
+  border-color: var(--accent-amber); font-weight: 700;
+}
+
 /* ── Theme Toggle Button ──────────────────────────────────── */
 .theme-btn {
   background: var(--surface); border: 1px solid var(--border);
@@ -266,7 +280,7 @@ body {
   border-radius: var(--radius-sm);
 }
 .group-header:first-child { margin-top: 0; }
-.group-header.hidden { display: none; }
+.group-header.hidden, .group-header.hidden-sub { display: none; }
 .group-icon { font-size: 14px; }
 .group-title { color: var(--text); }
 .group-meta { color: var(--text-muted); font-weight: 400; font-size: 11px; }
@@ -295,7 +309,7 @@ body {
 }
 .record:hover { border-color: var(--accent-blue); }
 .record.focused { outline: 2px solid var(--accent-blue); outline-offset: -1px; }
-.record.hidden { display: none; }
+.record.hidden, .record.hidden-sub { display: none; }
 
 /* Error records */
 .record.has-error { border-left: 3px solid var(--accent-red); }
