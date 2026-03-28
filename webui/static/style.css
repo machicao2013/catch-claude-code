@@ -371,7 +371,7 @@ body {
 .messages-list { margin-bottom: 6px; }
 
 .msg-numbered {
-  display: flex; align-items: flex-start; gap: 0; margin-bottom: 6px;
+  display: flex; align-items: flex-start; gap: 0; margin-bottom: 2px;
 }
 .msg-index {
   flex-shrink: 0; width: 24px; min-width: 24px;
@@ -379,11 +379,13 @@ body {
   text-align: right; padding-top: 5px; padding-right: 6px;
   opacity: 0.6; user-select: none;
 }
-.msg-numbered .msg { margin-bottom: 0; flex: 1; min-width: 0; }
+.msg-numbered .msg-group { flex: 1; min-width: 0; }
+.msg-group { display: flex; flex-direction: column; gap: 4px; }
 
 .msg {
   display: flex; gap: 8px; margin-bottom: 6px; align-items: flex-start;
 }
+.msg-group .msg { margin-bottom: 0; }
 .role-tag {
   flex-shrink: 0; padding: 2px 8px; border-radius: var(--radius-sm);
   font-size: 9px; font-weight: 700; text-transform: uppercase;

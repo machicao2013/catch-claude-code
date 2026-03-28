@@ -212,7 +212,8 @@ function renderMessage(msg) {
       frags.push(renderTextMsg(role, JSON.stringify(block)));
     }
   }
-  return frags.join('');
+  // 包裹在 msg-group 容器中，确保多 block 消息布局正确
+  return `<div class="msg-group">${frags.join('')}</div>`;
 }
 
 function renderTextMsg(role, text) {
