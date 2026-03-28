@@ -360,6 +360,24 @@ function renderRecordBody(body, rec, summary) {
   }
   reqHtml += `</div>`;
 
+  // 渲染 system prompt
+  if (reqBody.system) {
+    reqHtml += `<div class="system-block">`;
+    reqHtml += `<div class="system-label">SYSTEM</div>`;
+    const sys = reqBody.system;
+    if (Array.isArray(sys)) {
+      for (const block of sys) {
+        const text = block.text || JSON.stringify(block);
+        reqHtml += `<div class="system-item" data-lines="${text.split('\n').length}">${escHtml(text)}</div>`;
+      }
+    } else if (typeof sys === 'string') {
+      reqHtml += `<div class="system-item" data-lines="${sys.split('\n').length}">${escHtml(sys)}</div>`;
+    } else {
+      reqHtml += `<div class="system-item">${escHtml(JSON.stringify(sys))}</div>`;
+    }
+    reqHtml += `</div>`;
+  }
+
   if (messages.length > 0) {
     reqHtml += `<div class="messages-list">`;
     for (let i = 0; i < messages.length; i++) {
@@ -427,7 +445,7 @@ function renderRecordBody(body, rec, summary) {
       <div class="split-pane split-response">${respHtml}</div>
     </div>`;
 
-  body.querySelectorAll('.msg-content, .tool-param').forEach(contentEl => {
+  body.querySelectorAll('.msg-content, .tool-param, .system-item').forEach(contentEl => {
     const lines = parseInt(contentEl.dataset.lines || '0', 10);
     const threshold = contentEl.classList.contains('tool-param') ? 5 : 10;
     if (lines > threshold) makeCollapsible(contentEl, threshold);
