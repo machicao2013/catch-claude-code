@@ -130,6 +130,7 @@ body {
 .role-assistant{ background: var(--bg-assistant); color: var(--assistant); }
 .role-tool-use { background: var(--bg-tool); color: var(--tool); border: 1px solid var(--tool); }
 .role-result   { background: #1e293b; color: var(--result); }
+.role-thinking { background: #1e1b3a; color: #c4b5fd; border: 1px dashed #7c3aed; }
 
 .msg-content {
   flex: 1; background: var(--surface); border-radius: 6px;
@@ -137,6 +138,7 @@ body {
   word-break: break-word; white-space: pre-wrap;
 }
 .msg-content.tool-use-content { border: 1px solid #166534; }
+.msg-content.thinking-content { border: 1px dashed #7c3aed; opacity: 0.8; font-style: italic; }
 .tool-name { color: var(--tool); font-weight: 700; margin-bottom: 4px; font-size: 12px; }
 .tool-param { color: var(--muted); font-size: 11px; }
 .tool-param span { color: var(--text); }

@@ -101,6 +101,14 @@ function renderToolResult(block) {
     </div>`;
 }
 
+function renderThinking(text) {
+  return `
+    <div class="msg">
+      <span class="role-tag role-thinking">think</span>
+      <div class="msg-content thinking-content" data-lines="${(text || '').split('\n').length}">${escHtml(text || '')}</div>
+    </div>`;
+}
+
 // ── 从摘要数据渲染折叠行 ──────────────────────────────────
 // summary 格式: { id, timestamp, duration_ms, model, msg_count, stop_reason, in_tokens, out_tokens, cache_read, cache_create }
 function renderSummaryRecord(summary, isNew) {
@@ -228,6 +236,10 @@ function renderRecordBody(body, rec, summary) {
         html += renderTextMsg('assistant', block.text);
       } else if (block.type === 'tool_use') {
         html += renderToolUse(block);
+      } else if (block.type === 'thinking') {
+        html += renderThinking(block.thinking || '');
+      } else if (block.type === 'redacted_thinking') {
+        html += renderThinking('[redacted thinking]');
       } else {
         html += renderTextMsg('assistant', JSON.stringify(block));
       }
