@@ -184,81 +184,80 @@ function renderRecordBody(body, rec, summary) {
   const usage = respBody.usage || {};
   const status = rec.response?.status || 0;
 
-  let html = '';
+  // ═══════ 并排布局容器 ═══════
+  let reqHtml = '';
+  let respHtml = '';
 
-  // ═══════ REQUEST 区域 ═══════
-  html += `<div class="section-header section-request">▶ Request</div>`;
-  html += `<div class="section-meta">`;
-  html += `<span><span class="label">model:</span> <span class="val">${escHtml(reqBody.model || '—')}</span></span>`;
+  // ── 左侧：REQUEST ──
+  reqHtml += `<div class="section-header section-request">▶ Request</div>`;
+  reqHtml += `<div class="section-meta">`;
+  reqHtml += `<span><span class="label">model:</span> <span class="val">${escHtml(reqBody.model || '—')}</span></span>`;
   if (reqBody.system) {
     const sysLen = JSON.stringify(reqBody.system).length;
-    html += `<span><span class="label">system:</span> <span class="val">${fmtNum(sysLen)} chars</span></span>`;
+    reqHtml += `<span><span class="label">system:</span> <span class="val">${fmtNum(sysLen)} chars</span></span>`;
   }
-  html += `<span><span class="label">messages:</span> <span class="val">${messages.length} 条</span></span>`;
+  reqHtml += `<span><span class="label">messages:</span> <span class="val">${messages.length} 条</span></span>`;
   if (reqBody.tools) {
-    html += `<span><span class="label">tools:</span> <span class="val">${reqBody.tools.length} 个</span></span>`;
+    reqHtml += `<span><span class="label">tools:</span> <span class="val">${reqBody.tools.length} 个</span></span>`;
   }
-  html += `</div>`;
+  reqHtml += `</div>`;
 
-  // 渲染 messages
   if (messages.length > 0) {
-    html += `<div class="messages-list">`;
+    reqHtml += `<div class="messages-list">`;
     for (const msg of messages) {
-      html += renderMessage(msg);
+      reqHtml += renderMessage(msg);
     }
-    html += `</div>`;
+    reqHtml += `</div>`;
   }
 
-  // ═══════ RESPONSE 区域 ═══════
-  html += `<div class="section-header section-response">◀ Response</div>`;
-
-  // HTTP 状态码
+  // ── 右侧：RESPONSE ──
   const statusClass = status >= 200 && status < 300 ? 'status-ok' : 'status-err';
-  html += `<div class="section-meta">`;
-  html += `<span><span class="label">status:</span> <span class="${statusClass}">${status}</span></span>`;
-  html += `<span><span class="label">duration:</span> <span class="val">${fmtDuration(rec.duration_ms)}</span></span>`;
+  respHtml += `<div class="section-header section-response">◀ Response</div>`;
+  respHtml += `<div class="section-meta">`;
+  respHtml += `<span><span class="label">status:</span> <span class="${statusClass}">${status}</span></span>`;
+  respHtml += `<span><span class="label">duration:</span> <span class="val">${fmtDuration(rec.duration_ms)}</span></span>`;
   if (respBody.stop_reason) {
-    html += `<span><span class="label">stop:</span> <span class="val">${escHtml(respBody.stop_reason)}</span></span>`;
+    respHtml += `<span><span class="label">stop:</span> <span class="val">${escHtml(respBody.stop_reason)}</span></span>`;
   }
-  html += `</div>`;
+  respHtml += `</div>`;
 
   // 错误信息
   if (respBody.error) {
     const errMsg = respBody.error.message || JSON.stringify(respBody.error);
     const errType = respBody.error.type || '';
-    html += `<div class="error-block">`;
-    if (errType) html += `<div class="error-type">${escHtml(errType)}</div>`;
-    html += `<div class="error-message">${escHtml(errMsg)}</div>`;
-    html += `</div>`;
+    respHtml += `<div class="error-block">`;
+    if (errType) respHtml += `<div class="error-type">${escHtml(errType)}</div>`;
+    respHtml += `<div class="error-message">${escHtml(errMsg)}</div>`;
+    respHtml += `</div>`;
   }
 
-  // 响应 content（正常情况）
+  // 响应 content
   if (respBody.content && Array.isArray(respBody.content)) {
-    html += `<div class="messages-list">`;
+    respHtml += `<div class="messages-list">`;
     for (const block of respBody.content) {
       if (block.type === 'text') {
-        html += renderTextMsg('assistant', block.text);
+        respHtml += renderTextMsg('assistant', block.text);
       } else if (block.type === 'tool_use') {
-        html += renderToolUse(block);
+        respHtml += renderToolUse(block);
       } else if (block.type === 'thinking') {
-        html += renderThinking(block.thinking || '');
+        respHtml += renderThinking(block.thinking || '');
       } else if (block.type === 'redacted_thinking') {
-        html += renderThinking('[redacted thinking]');
+        respHtml += renderThinking('[redacted thinking]');
       } else {
-        html += renderTextMsg('assistant', JSON.stringify(block));
+        respHtml += renderTextMsg('assistant', JSON.stringify(block));
       }
     }
-    html += `</div>`;
+    respHtml += `</div>`;
   }
 
-  // Token 用量（只在有数据时显示）
+  // Token 用量
   const inTok = usage.input_tokens || summary.in_tokens || 0;
   const outTok = usage.output_tokens || summary.out_tokens || 0;
   const cacheCreate = usage.cache_creation_input_tokens || summary.cache_create || 0;
   const cacheRead = usage.cache_read_input_tokens || summary.cache_read || 0;
 
   if (inTok || outTok || cacheCreate || cacheRead) {
-    html += `
+    respHtml += `
       <div class="response-footer">
         <span><span class="label">in:</span> <span class="tok-in">${fmtNum(inTok)}</span></span>
         <span><span class="label">out:</span> <span class="tok-out">${fmtNum(outTok)}</span></span>
@@ -267,7 +266,12 @@ function renderRecordBody(body, rec, summary) {
       </div>`;
   }
 
-  body.innerHTML = html;
+  // 组合为并排布局
+  body.innerHTML = `
+    <div class="split-view">
+      <div class="split-pane split-request">${reqHtml}</div>
+      <div class="split-pane split-response">${respHtml}</div>
+    </div>`;
 
   // 对超长内容启用折叠
   body.querySelectorAll('.msg-content, .tool-param').forEach(contentEl => {
