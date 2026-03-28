@@ -396,6 +396,7 @@ body {
 .role-tool-use { background: var(--role-tool-bg);   color: var(--role-tool-text); border: 1px solid var(--role-tool-border); }
 .role-result   { background: var(--role-result-bg); color: var(--role-result-text); }
 .role-thinking { background: var(--role-think-bg);  color: var(--role-think-text); border: 1px dashed var(--role-think-border); }
+.role-redacted { background: var(--role-think-bg);  color: var(--text-muted); border: 1px dashed var(--border); font-size: 8px; }
 
 .msg-content {
   flex: 1; background: var(--surface-alt); border-radius: var(--radius-md);
@@ -405,6 +406,7 @@ body {
 }
 .msg-content.tool-use-content { border-color: var(--role-tool-border); }
 .msg-content.thinking-content { border-style: dashed; border-color: var(--role-think-border); opacity: 0.85; font-style: italic; }
+.msg-content.redacted-content { border-style: dashed; border-color: var(--border); opacity: 0.5; font-style: italic; font-size: 11px; color: var(--text-muted); }
 
 .tool-name { color: var(--accent-green); font-weight: 700; margin-bottom: 4px; font-size: 12px; }
 .tool-param { color: var(--text-muted); font-size: 11px; }

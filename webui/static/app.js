@@ -207,7 +207,7 @@ function renderMessage(msg) {
     } else if (block.type === 'thinking') {
       frags.push(renderThinking(block.thinking || ''));
     } else if (block.type === 'redacted_thinking') {
-      frags.push(renderThinking('[redacted]'));
+      frags.push(renderRedacted());
     } else {
       frags.push(renderTextMsg(role, JSON.stringify(block)));
     }
@@ -255,13 +255,21 @@ function renderThinking(text) {
     return `
     <div class="msg">
       <span class="role-tag role-thinking">think</span>
-      <div class="msg-content thinking-content" style="opacity:0.5;font-style:italic;">（无内容）</div>
+      <div class="msg-content thinking-content" style="opacity:0.5;font-style:italic;">（空 thinking block）</div>
     </div>`;
   }
   return `
     <div class="msg">
       <span class="role-tag role-thinking">think</span>
       <div class="msg-content thinking-content" data-lines="${text.split('\n').length}">${escHtml(text)}</div>
+    </div>`;
+}
+
+function renderRedacted() {
+  return `
+    <div class="msg">
+      <span class="role-tag role-redacted">redacted</span>
+      <div class="msg-content redacted-content">思考内容已被 Anthropic API 审查删除，原始响应中无此部分数据</div>
     </div>`;
 }
 
