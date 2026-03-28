@@ -9,7 +9,8 @@ function fmtDuration(ms) {
 }
 
 function fmtNum(n) {
-  if (!n) return '0';
+  if (n == null || isNaN(n)) return '0';
+  if (n === 0) return '0';
   return n.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',');
 }
 
@@ -100,84 +101,102 @@ function renderToolResult(block) {
     </div>`;
 }
 
-// ── 渲染单条记录 ──────────────────────────────────────────
-function renderRecord(rec, isNew) {
+// ── 从摘要数据渲染折叠行 ──────────────────────────────────
+// summary 格式: { id, timestamp, duration_ms, model, msg_count, stop_reason, in_tokens, out_tokens, cache_read, cache_create }
+function renderSummaryRecord(summary, isNew) {
   const el = document.createElement('div');
   el.className = 'record' + (isNew ? ' new' : '');
-  el.dataset.id = rec.id;
+  el.dataset.id = summary.id;
 
-  // 解析请求体
-  const reqBody = rec.request?.body || {};
-  const respBody = rec.response?.body || {};
-  const usage = respBody.usage || {};
-  const stopReason = respBody.stop_reason || '—';
-
-  const timeStr = fmtTime(rec.timestamp);
-  const durStr = fmtDuration(rec.duration_ms);
-  const inTok = fmtNum(usage.input_tokens);
-  const outTok = fmtNum(usage.output_tokens);
-  const seqNum = rec.id; // e.g. "req_001"
+  const timeStr = fmtTime(summary.timestamp);
+  const durStr = fmtDuration(summary.duration_ms);
+  const inTok = fmtNum(summary.in_tokens);
+  const outTok = fmtNum(summary.out_tokens);
+  const model = summary.model || '—';
+  const stop = summary.stop_reason || '—';
 
   el.innerHTML = `
     <div class="record-header" onclick="toggleRecord(this)">
       <div class="record-header-left">
-        <span class="req-id">${escHtml(seqNum)}</span>
+        <span class="req-id">${escHtml(summary.id)}</span>
         <span class="req-time">${timeStr}</span>
         <span class="req-duration">${durStr}</span>
         <span class="req-tokens">${inTok} in / ${outTok} out</span>
-        <span class="req-stop">${escHtml(stopReason)}</span>
+        <span class="req-stop">${escHtml(stop)}</span>
       </div>
       <span class="expand-icon">▼</span>
     </div>
     <div class="record-body"></div>`;
 
-  // 懒渲染：展开时才填充 body
-  el._rec = rec;
+  el._summary = summary;
   el._rendered = false;
 
   return el;
 }
 
-function toggleRecord(headerEl) {
+// ── 展开时异步加载完整记录 ────────────────────────────────
+async function toggleRecord(headerEl) {
   const el = headerEl.closest('.record');
   el.classList.toggle('expanded');
 
   if (el.classList.contains('expanded') && !el._rendered) {
     el._rendered = true;
     const body = el.querySelector('.record-body');
-    const rec = el._rec;
-    const reqBody = rec.request?.body || {};
-    const messages = reqBody.messages || [];
-    const respBody = rec.response?.body || {};
-    const usage = respBody.usage || {};
+    const summary = el._summary;
 
-    let html = '';
-    for (const msg of messages) {
-      html += renderMessage(msg);
+    // 如果已有完整数据（SSE 实时推送的），直接用
+    if (el._fullRec) {
+      renderRecordBody(body, el._fullRec, summary);
+      return;
     }
 
-    // 响应 footer
-    const cacheCreate = fmtNum(usage.cache_creation_input_tokens);
-    const cacheRead = fmtNum(usage.cache_read_input_tokens);
-    html += `
-      <div class="response-footer">
-        <span><span class="label">stop:</span> <span class="val">${escHtml(respBody.stop_reason || '—')}</span></span>
-        <span><span class="label">dur:</span> <span class="val">${fmtDuration(rec.duration_ms)}</span></span>
-        <span><span class="label">in:</span> <span class="tok-in">${fmtNum(usage.input_tokens)}</span></span>
-        <span><span class="label">out:</span> <span class="tok-out">${fmtNum(usage.output_tokens)}</span></span>
-        <span><span class="label">cache_create:</span> <span class="tok-cache">${cacheCreate}</span></span>
-        <span><span class="label">cache_read:</span> <span class="tok-cache">${cacheRead}</span></span>
-      </div>`;
+    // 否则异步加载
+    body.innerHTML = '<div style="color:var(--muted);padding:8px;">加载中...</div>';
 
-    body.innerHTML = html;
-
-    // 对超长内容启用折叠
-    body.querySelectorAll('.msg-content, .tool-param').forEach(contentEl => {
-      const lines = parseInt(contentEl.dataset.lines || '0', 10);
-      const threshold = contentEl.classList.contains('tool-param') ? 5 : 10;
-      if (lines > threshold) makeCollapsible(contentEl, threshold);
-    });
+    try {
+      const resp = await fetch(`api/records/${encodeURIComponent(summary.id)}`);
+      if (!resp.ok) throw new Error(`${resp.status}`);
+      const rec = await resp.json();
+      renderRecordBody(body, rec, summary);
+    } catch (e) {
+      body.innerHTML = `<div style="color:var(--user);padding:8px;">加载失败: ${escHtml(e.message)}</div>`;
+      el._rendered = false; // 允许重试
+    }
   }
+}
+
+function renderRecordBody(body, rec, summary) {
+  const reqBody = rec.request?.body || {};
+  const messages = reqBody.messages || [];
+  const respBody = rec.response?.body || {};
+  const usage = respBody.usage || {};
+
+  let html = '';
+  for (const msg of messages) {
+    html += renderMessage(msg);
+  }
+
+  // 响应 footer
+  const cacheCreate = fmtNum(usage.cache_creation_input_tokens || summary.cache_create);
+  const cacheRead = fmtNum(usage.cache_read_input_tokens || summary.cache_read);
+  html += `
+    <div class="response-footer">
+      <span><span class="label">stop:</span> <span class="val">${escHtml(respBody.stop_reason || summary.stop_reason || '—')}</span></span>
+      <span><span class="label">dur:</span> <span class="val">${fmtDuration(rec.duration_ms)}</span></span>
+      <span><span class="label">in:</span> <span class="tok-in">${fmtNum(usage.input_tokens || summary.in_tokens)}</span></span>
+      <span><span class="label">out:</span> <span class="tok-out">${fmtNum(usage.output_tokens || summary.out_tokens)}</span></span>
+      <span><span class="label">cache_create:</span> <span class="tok-cache">${cacheCreate}</span></span>
+      <span><span class="label">cache_read:</span> <span class="tok-cache">${cacheRead}</span></span>
+    </div>`;
+
+  body.innerHTML = html;
+
+  // 对超长内容启用折叠
+  body.querySelectorAll('.msg-content, .tool-param').forEach(contentEl => {
+    const lines = parseInt(contentEl.dataset.lines || '0', 10);
+    const threshold = contentEl.classList.contains('tool-param') ? 5 : 10;
+    if (lines > threshold) makeCollapsible(contentEl, threshold);
+  });
 }
 
 // ── 统计更新 ──────────────────────────────────────────────
@@ -188,11 +207,10 @@ function updateStats() {
     `${totalReqs} 请求 · ${fmtNum(totalIn)} in · ${fmtNum(totalOut)} out tokens`;
 }
 
-function accStats(rec) {
+function accStatsSummary(s) {
   totalReqs++;
-  const u = rec.response?.body?.usage || {};
-  totalIn  += u.input_tokens  || 0;
-  totalOut += u.output_tokens || 0;
+  totalIn  += s.in_tokens  || 0;
+  totalOut += s.out_tokens || 0;
   updateStats();
 }
 
@@ -200,7 +218,7 @@ function accStats(rec) {
 async function main() {
   // 1. 获取模式信息
   const infoResp = await fetch('api/info');
-  if (!infoResp.ok) throw new Error(`/api/info failed: ${infoResp.status}`);
+  if (!infoResp.ok) throw new Error(`api/info failed: ${infoResp.status}`);
   const info = await infoResp.json();
   document.getElementById('filename').textContent = info.filename;
 
@@ -213,14 +231,14 @@ async function main() {
     badge.className = 'badge view';
   }
 
-  // 2. 加载已有记录
+  // 2. 加载摘要列表（轻量，几十 KB 而非几十 MB）
   const list = document.getElementById('records-list');
   const recsResp = await fetch('api/records');
-  if (!recsResp.ok) throw new Error(`/api/records failed: ${recsResp.status}`);
-  const records = await recsResp.json();
-  for (const rec of (records || [])) {
-    list.appendChild(renderRecord(rec, false));
-    accStats(rec);
+  if (!recsResp.ok) throw new Error(`api/records failed: ${recsResp.status}`);
+  const summaries = await recsResp.json();
+  for (const s of (summaries || [])) {
+    list.appendChild(renderSummaryRecord(s, false));
+    accStatsSummary(s);
   }
 
   // 3. 实时模式：连接 SSE
@@ -228,9 +246,21 @@ async function main() {
     const es = new EventSource('api/stream');
     es.addEventListener('record', e => {
       const rec = JSON.parse(e.data);
-      const el = renderRecord(rec, true);
+      // SSE 推送的是完整记录，提取摘要用于渲染折叠行
+      const summary = {
+        id: rec.id,
+        timestamp: rec.timestamp,
+        duration_ms: rec.duration_ms,
+        stop_reason: rec.response?.body?.stop_reason || '—',
+        in_tokens: rec.response?.body?.usage?.input_tokens || 0,
+        out_tokens: rec.response?.body?.usage?.output_tokens || 0,
+        cache_read: rec.response?.body?.usage?.cache_read_input_tokens || 0,
+        cache_create: rec.response?.body?.usage?.cache_creation_input_tokens || 0,
+      };
+      const el = renderSummaryRecord(summary, true);
+      el._fullRec = rec; // 缓存完整数据，展开时不需要再请求
       list.appendChild(el);
-      accStats(rec);
+      accStatsSummary(summary);
       el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     });
     es.onerror = () => {
@@ -238,7 +268,16 @@ async function main() {
       badge.textContent = '连接中断';
       badge.className = 'badge view';
     };
+    es.onopen = () => {
+      const badge = document.getElementById('mode-badge');
+      badge.textContent = 'live';
+      badge.className = 'badge live';
+    };
   }
 }
 
-main().catch(console.error);
+main().catch(e => {
+  console.error(e);
+  document.getElementById('records-list').innerHTML =
+    `<div style="color:var(--user);padding:20px;">加载失败: ${e.message}</div>`;
+});

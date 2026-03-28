@@ -113,7 +113,8 @@ func (s *Server) unsubscribe(ch chan []byte) {
 
 // registerRoutes 注册所有路由。
 func (s *Server) registerRoutes(mux *http.ServeMux) {
-	mux.HandleFunc("/api/records", s.handleRecords)
+	mux.HandleFunc("/api/records/", s.handleRecords) // /api/records/req_001 → 详情
+	mux.HandleFunc("/api/records", s.handleRecords)  // /api/records → 摘要列表
 	mux.HandleFunc("/api/stream", s.handleStream)
 	mux.HandleFunc("/api/info", s.handleInfo)
 	// 静态文件：index.html 及 /static/* 资源
