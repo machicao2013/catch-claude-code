@@ -1,4 +1,11 @@
-// ── 工具函数 ──────────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════
+// claude-spy viewer — Frontend Logic
+// Features: theme switching, search/filter, keyboard nav,
+//           lazy loading, SSE live updates, collapsible content
+// ═══════════════════════════════════════════════════════════════
+
+// ── Utilities ─────────────────────────────────────────────────
+
 function fmtTime(ts) {
   const d = new Date(ts);
   return d.toLocaleTimeString('zh-CN', { hour12: false });
@@ -20,7 +27,144 @@ function escHtml(s) {
     .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
-// ── 折叠/展开长内容 ─────────────────────────────────────────
+// ── Theme System ──────────────────────────────────────────────
+
+const THEMES = ['obsidian', 'daylight', 'phosphor'];
+const THEME_ICONS = { obsidian: '🌙', daylight: '☀️', phosphor: '⚡' };
+
+function getTheme() {
+  return document.documentElement.getAttribute('data-theme') || 'obsidian';
+}
+
+function setTheme(theme) {
+  document.documentElement.setAttribute('data-theme', theme);
+  localStorage.setItem('claude-spy-theme', theme);
+  const btn = document.getElementById('theme-toggle');
+  if (btn) btn.textContent = THEME_ICONS[theme] || '◐';
+}
+
+function cycleTheme() {
+  const cur = getTheme();
+  const idx = THEMES.indexOf(cur);
+  setTheme(THEMES[(idx + 1) % THEMES.length]);
+}
+
+// ── Search / Filter ───────────────────────────────────────────
+
+function setupSearch() {
+  const input = document.getElementById('search-input');
+  const countEl = document.getElementById('search-count');
+  let timer;
+  input.addEventListener('input', () => {
+    clearTimeout(timer);
+    timer = setTimeout(() => filterRecords(input.value, countEl), 300);
+  });
+  input.addEventListener('keydown', e => {
+    if (e.key === 'Escape') {
+      input.value = '';
+      filterRecords('', countEl);
+      input.blur();
+    }
+  });
+}
+
+function filterRecords(query, countEl) {
+  const q = query.toLowerCase().trim();
+  const records = document.querySelectorAll('.record');
+  let visible = 0, total = records.length;
+  records.forEach(el => {
+    if (!q) {
+      el.classList.remove('hidden');
+      visible++;
+      return;
+    }
+    const s = el._summary;
+    const haystack = [s.id, s.model || '', s.stop_reason || ''].join(' ').toLowerCase();
+    const isError = !s.stop_reason && s.out_tokens === 0;
+    const match = haystack.includes(q) || (q === 'error' && isError) || (q === 'err' && isError);
+    el.classList.toggle('hidden', !match);
+    if (match) visible++;
+  });
+  countEl.textContent = q ? `${visible}/${total}` : '';
+  // Reset focus index after filter
+  currentFocusIndex = -1;
+}
+
+// ── Keyboard Navigation ──────────────────────────────────────
+
+let currentFocusIndex = -1;
+
+function getVisibleRecords() {
+  return Array.from(document.querySelectorAll('.record:not(.hidden)'));
+}
+
+function focusRecord(idx) {
+  const records = getVisibleRecords();
+  // Remove old focus
+  document.querySelectorAll('.record.focused').forEach(el => el.classList.remove('focused'));
+  if (idx < 0 || idx >= records.length) return;
+  currentFocusIndex = idx;
+  const el = records[idx];
+  el.classList.add('focused');
+  el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+function setupKeyboard() {
+  document.addEventListener('keydown', e => {
+    const searchInput = document.getElementById('search-input');
+    const inSearch = document.activeElement === searchInput;
+
+    // Always available
+    if (e.key === '/' && !inSearch) {
+      e.preventDefault();
+      searchInput.focus();
+      return;
+    }
+
+    // Don't intercept when typing in search
+    if (inSearch) return;
+
+    const records = getVisibleRecords();
+
+    switch (e.key) {
+      case 'j':
+      case 'ArrowDown':
+        e.preventDefault();
+        focusRecord(Math.min(currentFocusIndex + 1, records.length - 1));
+        break;
+      case 'k':
+      case 'ArrowUp':
+        e.preventDefault();
+        focusRecord(Math.max(currentFocusIndex - 1, 0));
+        break;
+      case 'Enter':
+      case ' ':
+        e.preventDefault();
+        if (currentFocusIndex >= 0 && currentFocusIndex < records.length) {
+          const header = records[currentFocusIndex].querySelector('.record-header');
+          if (header) toggleRecord(header);
+        }
+        break;
+      case 'Escape':
+        // Collapse focused record
+        if (currentFocusIndex >= 0 && currentFocusIndex < records.length) {
+          const el = records[currentFocusIndex];
+          if (el.classList.contains('expanded')) {
+            const header = el.querySelector('.record-header');
+            if (header) toggleRecord(header);
+          }
+        }
+        break;
+      case 't':
+      case 'T':
+        cycleTheme();
+        break;
+    }
+  });
+}
+
+// ── Collapsible Content ──────────────────────────────────────
+
 function makeCollapsible(contentEl, threshold) {
   const lines = contentEl.innerText.split('\n');
   if (lines.length <= threshold) return;
@@ -32,22 +176,22 @@ function makeCollapsible(contentEl, threshold) {
   inner.innerHTML = contentEl.innerHTML;
   const btn = document.createElement('span');
   btn.className = 'toggle-btn';
-  btn.textContent = '▼ 点击展开全文';
-  btn.onclick = () => {
+  btn.textContent = '▼ 展开全文';
+  btn.onclick = (e) => {
+    e.stopPropagation();
     const collapsed = wrapper.classList.toggle('collapsed');
-    btn.textContent = collapsed ? '▼ 点击展开全文' : '▲ 收起';
+    btn.textContent = collapsed ? '▼ 展开全文' : '▲ 收起';
   };
   wrapper.appendChild(inner);
   wrapper.appendChild(btn);
   contentEl.replaceWith(wrapper);
 }
 
-// ── 渲染单条 message ──────────────────────────────────────
+// ── Message Rendering ────────────────────────────────────────
+
 function renderMessage(msg) {
   const role = msg.role || 'unknown';
   const content = msg.content;
-
-  // content 可能是字符串或数组
   const blocks = Array.isArray(content)
     ? content
     : [{ type: 'text', text: typeof content === 'string' ? content : JSON.stringify(content) }];
@@ -113,19 +257,19 @@ function renderThinking(text) {
     </div>`;
 }
 
-// ── 从摘要数据渲染折叠行 ──────────────────────────────────
-// summary 格式: { id, timestamp, duration_ms, model, msg_count, stop_reason, in_tokens, out_tokens, cache_read, cache_create }
+// ── Record Summary Rendering ─────────────────────────────────
+
 function renderSummaryRecord(summary, isNew) {
   const el = document.createElement('div');
-  el.className = 'record' + (isNew ? ' new' : '');
+  const isError = !summary.stop_reason && summary.out_tokens === 0;
+  el.className = 'record' + (isNew ? ' new' : '') + (isError ? ' has-error' : '');
   el.dataset.id = summary.id;
 
   const timeStr = fmtTime(summary.timestamp);
   const durStr = fmtDuration(summary.duration_ms);
   const inTok = fmtNum(summary.in_tokens);
   const outTok = fmtNum(summary.out_tokens);
-  const model = summary.model || '—';
-  const stop = summary.stop_reason || '—';
+  const stop = summary.stop_reason || (isError ? 'error' : '—');
 
   el.innerHTML = `
     <div class="record-header" onclick="toggleRecord(this)">
@@ -138,7 +282,7 @@ function renderSummaryRecord(summary, isNew) {
       </div>
       <span class="expand-icon">▼</span>
     </div>
-    <div class="record-body"></div>`;
+    <div class="record-body"><div class="record-body-inner"></div></div>`;
 
   el._summary = summary;
   el._rendered = false;
@@ -146,24 +290,23 @@ function renderSummaryRecord(summary, isNew) {
   return el;
 }
 
-// ── 展开时异步加载完整记录 ────────────────────────────────
+// ── Record Detail (Expand) ───────────────────────────────────
+
 async function toggleRecord(headerEl) {
   const el = headerEl.closest('.record');
   el.classList.toggle('expanded');
 
   if (el.classList.contains('expanded') && !el._rendered) {
     el._rendered = true;
-    const body = el.querySelector('.record-body');
+    const body = el.querySelector('.record-body-inner');
     const summary = el._summary;
 
-    // 如果已有完整数据（SSE 实时推送的），直接用
     if (el._fullRec) {
       renderRecordBody(body, el._fullRec, summary);
       return;
     }
 
-    // 否则异步加载
-    body.innerHTML = '<div style="color:var(--muted);padding:8px;">加载中...</div>';
+    body.innerHTML = '<div style="color:var(--text-muted);padding:8px;">加载中...</div>';
 
     try {
       const resp = await fetch(`api/records/${encodeURIComponent(summary.id)}`);
@@ -171,8 +314,8 @@ async function toggleRecord(headerEl) {
       const rec = await resp.json();
       renderRecordBody(body, rec, summary);
     } catch (e) {
-      body.innerHTML = `<div style="color:var(--user);padding:8px;">加载失败: ${escHtml(e.message)}</div>`;
-      el._rendered = false; // 允许重试
+      body.innerHTML = `<div style="color:var(--accent-red);padding:8px;">加载失败: ${escHtml(e.message)}</div>`;
+      el._rendered = false;
     }
   }
 }
@@ -184,21 +327,20 @@ function renderRecordBody(body, rec, summary) {
   const usage = respBody.usage || {};
   const status = rec.response?.status || 0;
 
-  // ═══════ 并排布局容器 ═══════
   let reqHtml = '';
   let respHtml = '';
 
-  // ── 左侧：REQUEST ──
-  reqHtml += `<div class="section-header section-request">▶ Request</div>`;
+  // ── LEFT: Request ──
+  reqHtml += `<div class="section-header section-request">▶ REQUEST</div>`;
   reqHtml += `<div class="section-meta">`;
   reqHtml += `<span><span class="label">model:</span> <span class="val">${escHtml(reqBody.model || '—')}</span></span>`;
   if (reqBody.system) {
     const sysLen = JSON.stringify(reqBody.system).length;
     reqHtml += `<span><span class="label">system:</span> <span class="val">${fmtNum(sysLen)} chars</span></span>`;
   }
-  reqHtml += `<span><span class="label">messages:</span> <span class="val">${messages.length} 条</span></span>`;
+  reqHtml += `<span><span class="label">messages:</span> <span class="val">${messages.length}</span></span>`;
   if (reqBody.tools) {
-    reqHtml += `<span><span class="label">tools:</span> <span class="val">${reqBody.tools.length} 个</span></span>`;
+    reqHtml += `<span><span class="label">tools:</span> <span class="val">${reqBody.tools.length}</span></span>`;
   }
   reqHtml += `</div>`;
 
@@ -210,9 +352,9 @@ function renderRecordBody(body, rec, summary) {
     reqHtml += `</div>`;
   }
 
-  // ── 右侧：RESPONSE ──
+  // ── RIGHT: Response ──
   const statusClass = status >= 200 && status < 300 ? 'status-ok' : 'status-err';
-  respHtml += `<div class="section-header section-response">◀ Response</div>`;
+  respHtml += `<div class="section-header section-response">◀ RESPONSE</div>`;
   respHtml += `<div class="section-meta">`;
   respHtml += `<span><span class="label">status:</span> <span class="${statusClass}">${status}</span></span>`;
   respHtml += `<span><span class="label">duration:</span> <span class="val">${fmtDuration(rec.duration_ms)}</span></span>`;
@@ -221,7 +363,6 @@ function renderRecordBody(body, rec, summary) {
   }
   respHtml += `</div>`;
 
-  // 错误信息
   if (respBody.error) {
     const errMsg = respBody.error.message || JSON.stringify(respBody.error);
     const errType = respBody.error.type || '';
@@ -231,7 +372,6 @@ function renderRecordBody(body, rec, summary) {
     respHtml += `</div>`;
   }
 
-  // 响应 content
   if (respBody.content && Array.isArray(respBody.content)) {
     respHtml += `<div class="messages-list">`;
     for (const block of respBody.content) {
@@ -250,7 +390,6 @@ function renderRecordBody(body, rec, summary) {
     respHtml += `</div>`;
   }
 
-  // Token 用量
   const inTok = usage.input_tokens || summary.in_tokens || 0;
   const outTok = usage.output_tokens || summary.out_tokens || 0;
   const cacheCreate = usage.cache_creation_input_tokens || summary.cache_create || 0;
@@ -266,14 +405,12 @@ function renderRecordBody(body, rec, summary) {
       </div>`;
   }
 
-  // 组合为并排布局
   body.innerHTML = `
     <div class="split-view">
       <div class="split-pane split-request">${reqHtml}</div>
       <div class="split-pane split-response">${respHtml}</div>
     </div>`;
 
-  // 对超长内容启用折叠
   body.querySelectorAll('.msg-content, .tool-param').forEach(contentEl => {
     const lines = parseInt(contentEl.dataset.lines || '0', 10);
     const threshold = contentEl.classList.contains('tool-param') ? 5 : 10;
@@ -281,12 +418,13 @@ function renderRecordBody(body, rec, summary) {
   });
 }
 
-// ── 统计更新 ──────────────────────────────────────────────
+// ── Stats ─────────────────────────────────────────────────────
+
 let totalReqs = 0, totalIn = 0, totalOut = 0;
 
 function updateStats() {
   document.getElementById('stats').textContent =
-    `${totalReqs} 请求 · ${fmtNum(totalIn)} in · ${fmtNum(totalOut)} out tokens`;
+    `${totalReqs} 请求 · ${fmtNum(totalIn)} in · ${fmtNum(totalOut)} out`;
 }
 
 function accStatsSummary(s) {
@@ -296,9 +434,20 @@ function accStatsSummary(s) {
   updateStats();
 }
 
-// ── 主入口 ────────────────────────────────────────────────
+// ── Main Entry ────────────────────────────────────────────────
+
 async function main() {
-  // 1. 获取模式信息
+  // Init theme button icon
+  setTheme(getTheme());
+
+  // Theme toggle click
+  document.getElementById('theme-toggle').addEventListener('click', cycleTheme);
+
+  // Setup search & keyboard
+  setupSearch();
+  setupKeyboard();
+
+  // 1. Fetch info
   const infoResp = await fetch('api/info');
   if (!infoResp.ok) throw new Error(`api/info failed: ${infoResp.status}`);
   const info = await infoResp.json();
@@ -306,53 +455,61 @@ async function main() {
 
   const badge = document.getElementById('mode-badge');
   if (info.mode === 'live') {
-    badge.textContent = 'live';
+    badge.textContent = 'LIVE';
     badge.className = 'badge live';
   } else {
     badge.textContent = '回顾';
     badge.className = 'badge view';
   }
 
-  // 2. 加载摘要列表（轻量，几十 KB 而非几十 MB）
+  // 2. Load summaries
   const list = document.getElementById('records-list');
   const recsResp = await fetch('api/records');
   if (!recsResp.ok) throw new Error(`api/records failed: ${recsResp.status}`);
   const summaries = await recsResp.json();
-  for (const s of (summaries || [])) {
-    list.appendChild(renderSummaryRecord(s, false));
-    accStatsSummary(s);
+
+  if (!summaries || summaries.length === 0) {
+    list.innerHTML = '<div class="empty-state"><div class="emoji">📋</div>暂无记录</div>';
+  } else {
+    for (const s of summaries) {
+      list.appendChild(renderSummaryRecord(s, false));
+      accStatsSummary(s);
+    }
   }
 
-  // 3. 实时模式：连接 SSE
+  // 3. SSE for live mode
   if (info.mode === 'live') {
     const es = new EventSource('api/stream');
     es.addEventListener('record', e => {
       const rec = JSON.parse(e.data);
-      // SSE 推送的是完整记录，提取摘要用于渲染折叠行
       const summary = {
         id: rec.id,
         timestamp: rec.timestamp,
         duration_ms: rec.duration_ms,
-        stop_reason: rec.response?.body?.stop_reason || '—',
+        model: rec.request?.body?.model || '',
+        msg_count: rec.request?.body?.messages?.length || 0,
+        stop_reason: rec.response?.body?.stop_reason || '',
         in_tokens: rec.response?.body?.usage?.input_tokens || 0,
         out_tokens: rec.response?.body?.usage?.output_tokens || 0,
         cache_read: rec.response?.body?.usage?.cache_read_input_tokens || 0,
         cache_create: rec.response?.body?.usage?.cache_creation_input_tokens || 0,
       };
+      // Remove empty state if present
+      const empty = list.querySelector('.empty-state');
+      if (empty) empty.remove();
+
       const el = renderSummaryRecord(summary, true);
-      el._fullRec = rec; // 缓存完整数据，展开时不需要再请求
+      el._fullRec = rec;
       list.appendChild(el);
       accStatsSummary(summary);
       el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     });
     es.onerror = () => {
-      const badge = document.getElementById('mode-badge');
       badge.textContent = '连接中断';
       badge.className = 'badge view';
     };
     es.onopen = () => {
-      const badge = document.getElementById('mode-badge');
-      badge.textContent = 'live';
+      badge.textContent = 'LIVE';
       badge.className = 'badge live';
     };
   }
@@ -361,5 +518,5 @@ async function main() {
 main().catch(e => {
   console.error(e);
   document.getElementById('records-list').innerHTML =
-    `<div style="color:var(--user);padding:20px;">加载失败: ${e.message}</div>`;
+    `<div class="empty-state"><div class="emoji">⚠️</div>加载失败: ${escHtml(e.message)}</div>`;
 });

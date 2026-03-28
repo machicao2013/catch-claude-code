@@ -1,10 +1,22 @@
 <!DOCTYPE html>
-<html lang="zh-CN">
+<html lang="zh-CN" data-theme="obsidian">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>claude-spy viewer</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="static/style.css?v=2">
+  <script>
+    // 在 CSS 加载前设置主题，防止闪烁
+    (function(){
+      var t = localStorage.getItem('claude-spy-theme');
+      if (t && ['obsidian','daylight','phosphor'].includes(t)) {
+        document.documentElement.setAttribute('data-theme', t);
+      }
+    })();
+  </script>
 </head>
 <body>
   <header id="topbar">
@@ -12,12 +24,23 @@
       <span class="logo">claude-spy</span>
       <span id="filename" class="filename"></span>
     </div>
+    <div class="topbar-center">
+      <div class="search-bar">
+        <span class="search-icon">⌕</span>
+        <input id="search-input" type="text" placeholder="搜索 ID、模型、内容… (按 / 聚焦)" autocomplete="off" />
+        <span id="search-count" class="search-count"></span>
+      </div>
+    </div>
     <div class="topbar-right">
       <span id="mode-badge" class="badge"></span>
       <span id="stats" class="stats"></span>
+      <button id="theme-toggle" class="theme-btn" title="切换主题 (T)">◐</button>
     </div>
   </header>
   <main id="records-list"></main>
+  <div class="kbd-hint">
+    <kbd>j</kbd><kbd>k</kbd> 导航 &nbsp;<kbd>Enter</kbd> 展开 &nbsp;<kbd>/</kbd> 搜索 &nbsp;<kbd>T</kbd> 主题
+  </div>
   <script src="static/app.js?v=2"></script>
 </body>
 </html>
