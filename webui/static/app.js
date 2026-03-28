@@ -170,24 +170,86 @@ function renderRecordBody(body, rec, summary) {
   const messages = reqBody.messages || [];
   const respBody = rec.response?.body || {};
   const usage = respBody.usage || {};
+  const status = rec.response?.status || 0;
 
   let html = '';
-  for (const msg of messages) {
-    html += renderMessage(msg);
+
+  // ═══════ REQUEST 区域 ═══════
+  html += `<div class="section-header section-request">▶ Request</div>`;
+  html += `<div class="section-meta">`;
+  html += `<span><span class="label">model:</span> <span class="val">${escHtml(reqBody.model || '—')}</span></span>`;
+  if (reqBody.system) {
+    const sysLen = JSON.stringify(reqBody.system).length;
+    html += `<span><span class="label">system:</span> <span class="val">${fmtNum(sysLen)} chars</span></span>`;
+  }
+  html += `<span><span class="label">messages:</span> <span class="val">${messages.length} 条</span></span>`;
+  if (reqBody.tools) {
+    html += `<span><span class="label">tools:</span> <span class="val">${reqBody.tools.length} 个</span></span>`;
+  }
+  html += `</div>`;
+
+  // 渲染 messages
+  if (messages.length > 0) {
+    html += `<div class="messages-list">`;
+    for (const msg of messages) {
+      html += renderMessage(msg);
+    }
+    html += `</div>`;
   }
 
-  // 响应 footer
-  const cacheCreate = fmtNum(usage.cache_creation_input_tokens || summary.cache_create);
-  const cacheRead = fmtNum(usage.cache_read_input_tokens || summary.cache_read);
-  html += `
-    <div class="response-footer">
-      <span><span class="label">stop:</span> <span class="val">${escHtml(respBody.stop_reason || summary.stop_reason || '—')}</span></span>
-      <span><span class="label">dur:</span> <span class="val">${fmtDuration(rec.duration_ms)}</span></span>
-      <span><span class="label">in:</span> <span class="tok-in">${fmtNum(usage.input_tokens || summary.in_tokens)}</span></span>
-      <span><span class="label">out:</span> <span class="tok-out">${fmtNum(usage.output_tokens || summary.out_tokens)}</span></span>
-      <span><span class="label">cache_create:</span> <span class="tok-cache">${cacheCreate}</span></span>
-      <span><span class="label">cache_read:</span> <span class="tok-cache">${cacheRead}</span></span>
-    </div>`;
+  // ═══════ RESPONSE 区域 ═══════
+  html += `<div class="section-header section-response">◀ Response</div>`;
+
+  // HTTP 状态码
+  const statusClass = status >= 200 && status < 300 ? 'status-ok' : 'status-err';
+  html += `<div class="section-meta">`;
+  html += `<span><span class="label">status:</span> <span class="${statusClass}">${status}</span></span>`;
+  html += `<span><span class="label">duration:</span> <span class="val">${fmtDuration(rec.duration_ms)}</span></span>`;
+  if (respBody.stop_reason) {
+    html += `<span><span class="label">stop:</span> <span class="val">${escHtml(respBody.stop_reason)}</span></span>`;
+  }
+  html += `</div>`;
+
+  // 错误信息
+  if (respBody.error) {
+    const errMsg = respBody.error.message || JSON.stringify(respBody.error);
+    const errType = respBody.error.type || '';
+    html += `<div class="error-block">`;
+    if (errType) html += `<div class="error-type">${escHtml(errType)}</div>`;
+    html += `<div class="error-message">${escHtml(errMsg)}</div>`;
+    html += `</div>`;
+  }
+
+  // 响应 content（正常情况）
+  if (respBody.content && Array.isArray(respBody.content)) {
+    html += `<div class="messages-list">`;
+    for (const block of respBody.content) {
+      if (block.type === 'text') {
+        html += renderTextMsg('assistant', block.text);
+      } else if (block.type === 'tool_use') {
+        html += renderToolUse(block);
+      } else {
+        html += renderTextMsg('assistant', JSON.stringify(block));
+      }
+    }
+    html += `</div>`;
+  }
+
+  // Token 用量（只在有数据时显示）
+  const inTok = usage.input_tokens || summary.in_tokens || 0;
+  const outTok = usage.output_tokens || summary.out_tokens || 0;
+  const cacheCreate = usage.cache_creation_input_tokens || summary.cache_create || 0;
+  const cacheRead = usage.cache_read_input_tokens || summary.cache_read || 0;
+
+  if (inTok || outTok || cacheCreate || cacheRead) {
+    html += `
+      <div class="response-footer">
+        <span><span class="label">in:</span> <span class="tok-in">${fmtNum(inTok)}</span></span>
+        <span><span class="label">out:</span> <span class="tok-out">${fmtNum(outTok)}</span></span>
+        <span><span class="label">cache_create:</span> <span class="tok-cache">${fmtNum(cacheCreate)}</span></span>
+        <span><span class="label">cache_read:</span> <span class="tok-cache">${fmtNum(cacheRead)}</span></span>
+      </div>`;
+  }
 
   body.innerHTML = html;
 
