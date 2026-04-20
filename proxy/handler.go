@@ -110,6 +110,23 @@ func (h *Handler) handleMessages(w http.ResponseWriter, r *http.Request) {
 	}
 	defer resp.Body.Close()
 
+	// 401 时打印详细诊断日志
+	if resp.StatusCode == http.StatusUnauthorized {
+		errBody, _ := io.ReadAll(resp.Body)
+		h.printer.PrintError(fmt.Sprintf(
+			"[401 Unauthorized] upstream=%s path=%s\n  -- Request Headers --\n%s\n  -- Response Headers --\n%s\n  -- Response Body --\n%s",
+			h.targetURL,
+			r.URL.Path,
+			formatHeaders(proxyReq.Header),
+			formatHeaders(resp.Header),
+			string(errBody),
+		))
+		copyHeaders(w.Header(), resp.Header)
+		w.WriteHeader(resp.StatusCode)
+		w.Write(errBody)
+		return
+	}
+
 	copyHeaders(w.Header(), resp.Header)
 	w.WriteHeader(resp.StatusCode)
 
@@ -301,6 +318,22 @@ func describeContent(blocks []ContentBlock) string {
 		}
 	}
 	return strings.Join(parts, " + ")
+}
+
+func formatHeaders(h http.Header) string {
+	var sb strings.Builder
+	for k, vv := range h {
+		// 脱敏：Authorization / x-api-key 只显示前8位
+		for _, v := range vv {
+			if strings.EqualFold(k, "Authorization") || strings.EqualFold(k, "x-api-key") {
+				if len(v) > 8 {
+					v = v[:8] + "..."
+				}
+			}
+			sb.WriteString(fmt.Sprintf("    %s: %s\n", k, v))
+		}
+	}
+	return sb.String()
 }
 
 func copyHeaders(dst, src http.Header) {
