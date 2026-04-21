@@ -62,3 +62,24 @@ func TestHandleFiles_LimitTo100(t *testing.T) {
 		t.Errorf("expected 100 files (cap), got %d", len(files))
 	}
 }
+
+func TestHandleServeInfo(t *testing.T) {
+	s := &Server{mode: ModeServe, logDir: "/tmp", subs: make(map[chan []byte]struct{})}
+	req := httptest.NewRequest("GET", "/api/info?file=test.jsonl", nil)
+	w := httptest.NewRecorder()
+	s.handleServeInfo(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", w.Code)
+	}
+	var info InfoResponse
+	if err := json.NewDecoder(w.Body).Decode(&info); err != nil {
+		t.Fatalf("decode error: %v", err)
+	}
+	if info.Mode != "view" {
+		t.Errorf("expected mode=view, got %s", info.Mode)
+	}
+	if info.Filename != "test.jsonl" {
+		t.Errorf("expected filename=test.jsonl, got %s", info.Filename)
+	}
+}

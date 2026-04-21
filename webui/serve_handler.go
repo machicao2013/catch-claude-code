@@ -23,6 +23,7 @@ type FileInfo struct {
 // registerServeRoutes registers serve-mode routes.
 func (s *Server) registerServeRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("/api/files", s.handleFiles)
+	mux.HandleFunc("/api/info", s.handleServeInfo)
 	mux.HandleFunc("/api/records", s.handleServeRecords)
 	mux.Handle("/static/", http.FileServer(http.FS(staticFS)))
 	mux.HandleFunc("/", s.handleServeRoot)
@@ -74,6 +75,18 @@ func (s *Server) handleFiles(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(files)
+}
+
+// handleServeInfo handles /api/info in serve mode.
+// Returns mode="view" and filename from the ?file= query param.
+func (s *Server) handleServeInfo(w http.ResponseWriter, r *http.Request) {
+	filename := r.URL.Query().Get("file")
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(InfoResponse{
+		Mode:     "view",
+		Filename: filename,
+		Total:    0,
+	})
 }
 
 // handleServeRecords handles GET /api/records?file=<filename>
@@ -160,7 +173,11 @@ func (s *Server) renderListPage(w http.ResponseWriter, r *http.Request, errFile 
 	w.Write([]byte(page))
 }
 
-// renderViewerPage renders the viewer page with a back-link injected.
+// renderViewerPage renders the viewer page for a specific file.
+// Injects:
+//   - a "← 返回列表" back-link into the topbar
+//   - a JS snippet that patches window.fetch so app.js API calls
+//     include the correct ?file= query param
 func (s *Server) renderViewerPage(w http.ResponseWriter, r *http.Request, filename string) {
 	data, err := staticFS.ReadFile("static/index.html")
 	if err != nil {
@@ -169,16 +186,30 @@ func (s *Server) renderViewerPage(w http.ResponseWriter, r *http.Request, filena
 	}
 
 	ver := fmt.Sprintf("%d", time.Now().UnixMilli())
-	html := strings.ReplaceAll(string(data), "?v=2", "?v="+ver)
+	page := strings.ReplaceAll(string(data), "?v=2", "?v="+ver)
 
+	// Inject back-link after the logo span
 	backLink := `<a href="/" class="back-link">← 返回列表</a>`
-	html = strings.Replace(html,
+	page = strings.Replace(page,
 		`<span class="logo">claude-spy</span>`,
 		`<span class="logo">claude-spy</span>`+backLink,
 		1,
 	)
 
+	// Inject fetch-patching script so app.js API calls include ?file=<filename>
+	serveScript := fmt.Sprintf(`<script>
+window.__SERVE_FILE__ = %q;
+const _origFetch = window.fetch;
+window.fetch = function(url, opts) {
+  if (url === 'api/records') return _origFetch('api/records?file=' + encodeURIComponent(window.__SERVE_FILE__), opts);
+  if (url === 'api/info')    return _origFetch('api/info?file='    + encodeURIComponent(window.__SERVE_FILE__), opts);
+  return _origFetch(url, opts);
+};
+</script>`, filename)
+
+	page = strings.Replace(page, `<script src="static/app.js`, serveScript+`<script src="static/app.js`, 1)
+
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate")
-	w.Write([]byte(html))
+	w.Write([]byte(page))
 }
