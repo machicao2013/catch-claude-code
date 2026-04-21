@@ -83,3 +83,59 @@ func TestHandleServeInfo(t *testing.T) {
 		t.Errorf("expected filename=test.jsonl, got %s", info.Filename)
 	}
 }
+
+func TestHandleServeRecords_ReturnsSummaries(t *testing.T) {
+	dir := t.TempDir()
+	// 写一条合法 JSONL 记录（最简结构）
+	rec := `{"id":"req_001","timestamp":"2024-01-01T00:00:00Z","duration_ms":100,"request":{"body":{"model":"claude-3-opus","messages":[]}},"response":{"body":{"stop_reason":"end_turn","usage":{"input_tokens":10,"output_tokens":5}}}}`
+	os.WriteFile(filepath.Join(dir, "test.jsonl"), []byte(rec+"\n"), 0644)
+
+	s := &Server{mode: ModeServe, logDir: dir, subs: make(map[chan []byte]struct{})}
+	req := httptest.NewRequest("GET", "/api/records?file=test.jsonl", nil)
+	w := httptest.NewRecorder()
+	s.handleServeRecords(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+	var summaries []RecordSummary
+	if err := json.NewDecoder(w.Body).Decode(&summaries); err != nil {
+		t.Fatalf("decode error: %v", err)
+	}
+	if len(summaries) != 1 {
+		t.Fatalf("expected 1 summary, got %d", len(summaries))
+	}
+	if summaries[0].ID != "req_001" {
+		t.Errorf("expected id=req_001, got %s", summaries[0].ID)
+	}
+	if summaries[0].Model != "claude-3-opus" {
+		t.Errorf("expected model=claude-3-opus, got %s", summaries[0].Model)
+	}
+	if summaries[0].InTokens != 10 {
+		t.Errorf("expected in_tokens=10, got %d", summaries[0].InTokens)
+	}
+}
+
+func TestHandleServeRecordDetail_ReturnsRecord(t *testing.T) {
+	dir := t.TempDir()
+	rec := `{"id":"req_001","timestamp":"2024-01-01T00:00:00Z","duration_ms":100,"request":{"body":{"model":"claude-3-opus","messages":[]}},"response":{"body":{"stop_reason":"end_turn","usage":{"input_tokens":10,"output_tokens":5}}}}`
+	os.WriteFile(filepath.Join(dir, "test.jsonl"), []byte(rec+"\n"), 0644)
+
+	s := &Server{mode: ModeServe, logDir: dir, subs: make(map[chan []byte]struct{})}
+	req := httptest.NewRequest("GET", "/api/records/req_001?file=test.jsonl", nil)
+	w := httptest.NewRecorder()
+	s.handleServeRecordDetail(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+	// 验证返回了完整记录（不是摘要）
+	var result map[string]interface{}
+	if err := json.NewDecoder(w.Body).Decode(&result); err != nil {
+		t.Fatalf("decode error: %v", err)
+	}
+	if result["id"] != "req_001" {
+		t.Errorf("expected id=req_001, got %v", result["id"])
+	}
+}
+

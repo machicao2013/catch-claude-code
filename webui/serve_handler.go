@@ -24,6 +24,7 @@ type FileInfo struct {
 func (s *Server) registerServeRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("/api/files", s.handleFiles)
 	mux.HandleFunc("/api/info", s.handleServeInfo)
+	mux.HandleFunc("/api/records/", s.handleServeRecordDetail)
 	mux.HandleFunc("/api/records", s.handleServeRecords)
 	mux.Handle("/static/", http.FileServer(http.FS(staticFS)))
 	mux.HandleFunc("/", s.handleServeRoot)
@@ -102,21 +103,59 @@ func (s *Server) handleServeRecords(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "invalid file param", http.StatusBadRequest)
 		return
 	}
-	path := absPath
 	var recs []recorder.Record
-	loadErr := loadJSONLFile(path, func(rec recorder.Record) {
+	loadErr := loadJSONLFile(absPath, func(rec recorder.Record) {
 		recs = append(recs, rec)
 	})
 	if loadErr != nil {
 		http.Error(w, fmt.Sprintf("file not found: %s", filename), http.StatusNotFound)
 		return
 	}
-	if recs == nil {
-		recs = []recorder.Record{}
+
+	summaries := make([]RecordSummary, len(recs))
+	for i, rec := range recs {
+		summaries[i] = extractSummary(rec)
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	data, _ := json.Marshal(recs)
+	data, _ := json.Marshal(summaries)
+	gzipWrite(w, r, data)
+}
+
+// handleServeRecordDetail handles GET /api/records/<id>?file=<filename> in serve mode.
+func (s *Server) handleServeRecordDetail(w http.ResponseWriter, r *http.Request) {
+	filename := r.URL.Query().Get("file")
+	if filename == "" || !strings.HasSuffix(filename, ".jsonl") {
+		http.Error(w, "invalid file param", http.StatusBadRequest)
+		return
+	}
+	absPath := filepath.Join(s.logDir, filename)
+	rel, err := filepath.Rel(s.logDir, absPath)
+	if err != nil || strings.HasPrefix(rel, "..") {
+		http.Error(w, "invalid file param", http.StatusBadRequest)
+		return
+	}
+
+	id := strings.TrimPrefix(r.URL.Path, "/api/records/")
+	if id == "" {
+		http.Error(w, "missing record id", http.StatusBadRequest)
+		return
+	}
+
+	var found *recorder.Record
+	loadJSONLFile(absPath, func(rec recorder.Record) {
+		if found == nil && rec.ID == id {
+			cp := rec
+			found = &cp
+		}
+	})
+	if found == nil {
+		http.Error(w, "record not found", http.StatusNotFound)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	data, _ := json.Marshal(found)
 	gzipWrite(w, r, data)
 }
 
@@ -203,6 +242,7 @@ const _origFetch = window.fetch;
 window.fetch = function(url, opts) {
   if (url === 'api/records') return _origFetch('api/records?file=' + encodeURIComponent(window.__SERVE_FILE__), opts);
   if (url === 'api/info')    return _origFetch('api/info?file='    + encodeURIComponent(window.__SERVE_FILE__), opts);
+  if (url.startsWith('api/records/')) return _origFetch(url + '?file=' + encodeURIComponent(window.__SERVE_FILE__), opts);
   return _origFetch(url, opts);
 };
 </script>`, filename)
