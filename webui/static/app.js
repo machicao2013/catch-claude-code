@@ -27,6 +27,16 @@ function escHtml(s) {
     .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
+// simpleHash 对字符串做 djb2 哈希，返回 8 位十六进制字符串。
+// 用于 live 模式前端计算 session_fp，与后端 MD5 不同但同样稳定唯一。
+function simpleHash(str) {
+  let h = 5381;
+  for (let i = 0; i < str.length; i++) {
+    h = (((h << 5) + h) + str.charCodeAt(i)) >>> 0;
+  }
+  return h.toString(16).padStart(8, '0');
+}
+
 // ── Theme System ──────────────────────────────────────────────
 
 const THEMES = ['obsidian', 'daylight', 'claude', 'phosphor'];
@@ -718,18 +728,35 @@ async function main() {
     const es = new EventSource('api/stream');
     es.addEventListener('record', e => {
       const rec = JSON.parse(e.data);
+      const sysLen = JSON.stringify(rec.request?.body?.system || '').length;
+      // 计算 session_fp：取第一条 user 消息完整 text，与后端逻辑保持一致
+      let sessionFp = '';
+      if (sysLen <= 5000) {
+        const msgs = rec.request?.body?.messages || [];
+        if (msgs.length > 0 && msgs[0].role === 'user') {
+          const content = msgs[0].content;
+          let text = '';
+          if (typeof content === 'string') {
+            text = content;
+          } else if (Array.isArray(content)) {
+            text = content.filter(b => b.type === 'text').map(b => b.text || '').join('');
+          }
+          sessionFp = simpleHash(text);
+        }
+      }
       const summary = {
         id: rec.id,
         timestamp: rec.timestamp,
         duration_ms: rec.duration_ms,
         model: rec.request?.body?.model || '',
         msg_count: rec.request?.body?.messages?.length || 0,
-        sys_len: JSON.stringify(rec.request?.body?.system || '').length,
+        sys_len: sysLen,
         stop_reason: rec.response?.body?.stop_reason || '',
         in_tokens: rec.response?.body?.usage?.input_tokens || 0,
         out_tokens: rec.response?.body?.usage?.output_tokens || 0,
         cache_read: rec.response?.body?.usage?.cache_read_input_tokens || 0,
         cache_create: rec.response?.body?.usage?.cache_creation_input_tokens || 0,
+        session_fp: sessionFp,
       };
       // Remove empty state if present
       const empty = list.querySelector('.empty-state');
