@@ -81,11 +81,18 @@ func ReassembleSSEResponse(raw []byte) (*AssembledMessage, error) {
 		case "message_start":
 			var wrapper struct {
 				Message struct {
-					ID    string         `json:"id"`
-					Type  string         `json:"type"`
-					Role  string         `json:"role"`
-					Model string         `json:"model"`
-					Usage AssembledUsage `json:"usage"`
+					ID    string `json:"id"`
+					Type  string `json:"type"`
+					Role  string `json:"role"`
+					Model string `json:"model"`
+					Usage struct {
+						// Anthropic 格式
+						InputTokens         int64 `json:"input_tokens"`
+						CacheCreationTokens int64 `json:"cache_creation_input_tokens"`
+						CacheReadTokens     int64 `json:"cache_read_input_tokens"`
+						// OpenAI / GLM 兼容格式
+						PromptTokens int64 `json:"prompt_tokens"`
+					} `json:"usage"`
 				} `json:"message"`
 			}
 			json.Unmarshal([]byte(ev.Data), &wrapper)
@@ -94,6 +101,9 @@ func ReassembleSSEResponse(raw []byte) (*AssembledMessage, error) {
 			msg.Role = wrapper.Message.Role
 			msg.Model = wrapper.Message.Model
 			msg.Usage.InputTokens = wrapper.Message.Usage.InputTokens
+			if msg.Usage.InputTokens == 0 {
+				msg.Usage.InputTokens = wrapper.Message.Usage.PromptTokens
+			}
 			msg.Usage.CacheCreationTokens = wrapper.Message.Usage.CacheCreationTokens
 			msg.Usage.CacheReadTokens = wrapper.Message.Usage.CacheReadTokens
 
@@ -136,12 +146,18 @@ func ReassembleSSEResponse(raw []byte) (*AssembledMessage, error) {
 					StopReason string `json:"stop_reason"`
 				} `json:"delta"`
 				Usage struct {
+					// Anthropic 格式
 					OutputTokens int64 `json:"output_tokens"`
+					// OpenAI / GLM 兼容格式
+					CompletionTokens int64 `json:"completion_tokens"`
 				} `json:"usage"`
 			}
 			json.Unmarshal([]byte(ev.Data), &md)
 			msg.StopReason = md.Delta.StopReason
 			msg.Usage.OutputTokens = md.Usage.OutputTokens
+			if msg.Usage.OutputTokens == 0 {
+				msg.Usage.OutputTokens = md.Usage.CompletionTokens
+			}
 		}
 	}
 
