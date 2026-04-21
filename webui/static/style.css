@@ -726,3 +726,19 @@ kbd {
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
 ::-webkit-scrollbar-thumb:hover { background: var(--border-accent); }
+
+/* serve mode — back link in topbar */
+.back-link {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  text-decoration: none;
+  margin-left: 0.75rem;
+  padding: 2px 8px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  transition: color 0.15s, border-color 0.15s;
+}
+.back-link:hover {
+  color: var(--accent);
+  border-color: var(--accent);
+}

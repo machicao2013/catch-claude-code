@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="obsidian">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>claude-spy — 日志列表</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="static/style.css?v=1">
+  <script>
+    (function(){
+      var t = localStorage.getItem('claude-spy-theme');
+      if (t && ['obsidian','daylight','claude','phosphor'].includes(t)) {
+        document.documentElement.setAttribute('data-theme', t);
+      }
+    })();
+  </script>
+  <style>
+    .file-table { width: 100%; border-collapse: collapse; margin-top: 1rem; }
+    .file-table th, .file-table td { padding: 0.6rem 1rem; text-align: left; border-bottom: 1px solid var(--border); }
+    .file-table th { color: var(--text-muted); font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.05em; }
+    .file-table tr:hover td { background: var(--bg-hover); cursor: pointer; }
+    .file-table a { color: var(--text-primary); text-decoration: none; }
+    .file-table a:hover { color: var(--accent); }
+    .file-size { color: var(--text-muted); font-size: 0.85rem; }
+    .file-time { color: var(--text-muted); font-size: 0.85rem; white-space: nowrap; }
+    .error-notice { background: var(--error-bg, #3a1a1a); color: var(--error-text, #f87171);
+      border: 1px solid var(--error-border, #7f1d1d); border-radius: 6px;
+      padding: 0.6rem 1rem; margin-bottom: 1rem; font-size: 0.9rem; }
+    .empty-state { text-align: center; padding: 4rem; color: var(--text-muted); }
+    .list-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.5rem; }
+    .list-title { font-size: 1rem; color: var(--text-muted); }
+  </style>
+</head>
+<body>
+  <header id="topbar">
+    <div class="topbar-left">
+      <span class="logo">claude-spy</span>
+      <span class="filename">日志列表</span>
+    </div>
+    <div class="topbar-center"></div>
+    <div class="topbar-right">
+      <button id="theme-toggle" class="theme-btn" title="切换主题 (T)">◐</button>
+    </div>
+  </header>
+
+  <main style="padding: 1.5rem 2rem; max-width: 960px; margin: 0 auto;">
+    <div id="error-notice"></div>
+    <div class="list-header">
+      <span class="list-title" id="file-count"></span>
+    </div>
+    <div id="file-list"></div>
+  </main>
+
+  <script>
+    // Theme
+    const THEMES = ['obsidian', 'daylight', 'claude', 'phosphor'];
+    const THEME_ICONS = { obsidian: '🌙', daylight: '☀️', claude: '🧡', phosphor: '⚡' };
+    function cycleTheme() {
+      const cur = document.documentElement.getAttribute('data-theme') || 'obsidian';
+      const next = THEMES[(THEMES.indexOf(cur) + 1) % THEMES.length];
+      document.documentElement.setAttribute('data-theme', next);
+      localStorage.setItem('claude-spy-theme', next);
+      document.getElementById('theme-toggle').textContent = THEME_ICONS[next] || '◐';
+    }
+    document.getElementById('theme-toggle').addEventListener('click', cycleTheme);
+    (function() {
+      const t = document.documentElement.getAttribute('data-theme') || 'obsidian';
+      document.getElementById('theme-toggle').textContent = THEME_ICONS[t] || '◐';
+    })();
+
+    function parseFilename(name) {
+      const m = name.match(/^(\d{4})(\d{2})(\d{2})_(\d{2})(\d{2})(\d{2})/);
+      if (!m) return name;
+      return `${m[1]}-${m[2]}-${m[3]} ${m[4]}:${m[5]}:${m[6]}`;
+    }
+
+    function fmtSize(bytes) {
+      if (bytes < 1024) return bytes + ' B';
+      if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+      return (bytes / 1024 / 1024).toFixed(1) + ' MB';
+    }
+
+    async function loadFiles() {
+      const resp = await fetch('api/files');
+      if (!resp.ok) throw new Error('api/files failed');
+      const files = await resp.json();
+      const container = document.getElementById('file-list');
+      const countEl = document.getElementById('file-count');
+
+      if (!files || files.length === 0) {
+        container.innerHTML = '<div class="empty-state">暂无日志文件</div>';
+        countEl.textContent = '';
+        return;
+      }
+
+      countEl.textContent = `共 ${files.length} 个文件`;
+
+      const table = document.createElement('table');
+      table.className = 'file-table';
+      table.innerHTML = `
+        <thead><tr>
+          <th>时间</th>
+          <th>文件名</th>
+          <th>大小</th>
+        </tr></thead>
+        <tbody id="file-tbody"></tbody>`;
+      container.appendChild(table);
+
+      const tbody = table.querySelector('#file-tbody');
+      for (const f of files) {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td class="file-time">${parseFilename(f.filename)}</td>
+          <td><a href="/${encodeURIComponent(f.filename)}">${f.filename}</a></td>
+          <td class="file-size">${fmtSize(f.size)}</td>`;
+        tr.addEventListener('click', () => { location.href = '/' + encodeURIComponent(f.filename); });
+        tbody.appendChild(tr);
+      }
+    }
+
+    loadFiles().catch(e => {
+      document.getElementById('file-list').innerHTML =
+        `<div class="empty-state">加载失败: ${e.message}</div>`;
+    });
+  </script>
+</body>
+</html>
