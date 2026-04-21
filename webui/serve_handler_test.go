@@ -16,8 +16,11 @@ func TestHandleFiles_ReturnsJSON(t *testing.T) {
 	f1 := filepath.Join(dir, "20240101_120000_aaaa.jsonl")
 	f2 := filepath.Join(dir, "20240102_130000_bbbb.jsonl")
 	os.WriteFile(f1, []byte(`{}`), 0644)
-	time.Sleep(10 * time.Millisecond)
 	os.WriteFile(f2, []byte(`{}`), 0644)
+	t1 := time.Now().Add(-2 * time.Second)
+	t2 := time.Now()
+	os.Chtimes(f1, t1, t1)
+	os.Chtimes(f2, t2, t2)
 
 	s := &Server{mode: ModeServe, logDir: dir, subs: make(map[chan []byte]struct{})}
 
@@ -52,7 +55,9 @@ func TestHandleFiles_LimitTo100(t *testing.T) {
 	s.handleFiles(w, req)
 
 	var files []FileInfo
-	json.NewDecoder(w.Body).Decode(&files)
+	if err := json.NewDecoder(w.Body).Decode(&files); err != nil {
+		t.Fatalf("decode error: %v", err)
+	}
 	if len(files) != 100 {
 		t.Errorf("expected 100 files (cap), got %d", len(files))
 	}

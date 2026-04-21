@@ -4,6 +4,7 @@ import (
 	"claude-spy/recorder"
 	"encoding/json"
 	"fmt"
+	"html"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -78,18 +79,22 @@ func (s *Server) handleFiles(w http.ResponseWriter, r *http.Request) {
 // handleServeRecords handles GET /api/records?file=<filename>
 func (s *Server) handleServeRecords(w http.ResponseWriter, r *http.Request) {
 	filename := r.URL.Query().Get("file")
-	if filename == "" || !strings.HasSuffix(filename, ".jsonl") ||
-		strings.ContainsAny(filename, "/\\") {
+	if filename == "" || !strings.HasSuffix(filename, ".jsonl") {
 		http.Error(w, "invalid file param", http.StatusBadRequest)
 		return
 	}
-
-	path := filepath.Join(s.logDir, filename)
+	absPath := filepath.Join(s.logDir, filename)
+	rel, err := filepath.Rel(s.logDir, absPath)
+	if err != nil || strings.HasPrefix(rel, "..") {
+		http.Error(w, "invalid file param", http.StatusBadRequest)
+		return
+	}
+	path := absPath
 	var recs []recorder.Record
-	err := loadJSONLFile(path, func(rec recorder.Record) {
+	loadErr := loadJSONLFile(path, func(rec recorder.Record) {
 		recs = append(recs, rec)
 	})
-	if err != nil {
+	if loadErr != nil {
 		http.Error(w, fmt.Sprintf("file not found: %s", filename), http.StatusNotFound)
 		return
 	}
@@ -111,13 +116,18 @@ func (s *Server) handleServeRoot(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if !strings.HasSuffix(path, ".jsonl") || strings.ContainsAny(path, "/\\") {
+	if !strings.HasSuffix(path, ".jsonl") {
 		http.NotFound(w, r)
 		return
 	}
-
 	fullPath := filepath.Join(s.logDir, path)
-	if _, err := os.Stat(fullPath); os.IsNotExist(err) {
+	rel, relErr := filepath.Rel(s.logDir, fullPath)
+	if relErr != nil || strings.HasPrefix(rel, "..") {
+		http.NotFound(w, r)
+		return
+	}
+	if _, statErr := os.Stat(fullPath); statErr != nil {
+		// treat any stat error (not-exist, permission, etc.) as not-found
 		s.renderListPage(w, r, path)
 		return
 	}
@@ -135,19 +145,19 @@ func (s *Server) renderListPage(w http.ResponseWriter, r *http.Request, errFile 
 	}
 
 	ver := fmt.Sprintf("%d", time.Now().UnixMilli())
-	html := strings.ReplaceAll(string(data), "?v=1", "?v="+ver)
+	page := strings.ReplaceAll(string(data), "?v=1", "?v="+ver)
 
 	if errFile != "" {
 		notice := fmt.Sprintf(
 			`<div id="error-notice" class="error-notice">文件 <code>%s</code> 不存在</div>`,
-			errFile,
+			html.EscapeString(errFile),
 		)
-		html = strings.Replace(html, `<div id="error-notice"></div>`, notice, 1)
+		page = strings.Replace(page, `<div id="error-notice"></div>`, notice, 1)
 	}
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate")
-	w.Write([]byte(html))
+	w.Write([]byte(page))
 }
 
 // renderViewerPage renders the viewer page with a back-link injected.
