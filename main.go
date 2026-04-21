@@ -45,6 +45,11 @@ func run() int {
 		return runView(os.Args[2:])
 	}
 
+	// 检查是否为 serve 子命令
+	if len(os.Args) > 1 && os.Args[1] == "serve" {
+		return runServe(os.Args[2:])
+	}
+
 	args := parseArgs(os.Args[1:])
 
 	// --upstream 必填，且须为合法 URL（有 scheme 和 host）
@@ -193,6 +198,62 @@ func defaultLogDir() string {
 	return filepath.Join(home, ".claude-spy", "logs")
 }
 
+type serveConfig struct {
+	port   int
+	logDir string
+}
+
+func parseServeArgs(args []string) serveConfig {
+	cfg := serveConfig{
+		port:   8888,
+		logDir: defaultLogDir(),
+	}
+	for i := 0; i < len(args); i++ {
+		switch args[i] {
+		case "--port":
+			if i+1 < len(args) {
+				n, err := strconv.Atoi(args[i+1])
+				if err != nil || n < 0 || n > 65535 {
+					fmt.Fprintf(os.Stderr, "Error: invalid --port value %q\n", args[i+1])
+					os.Exit(1)
+				}
+				cfg.port = n
+				i++
+			}
+		case "--log-dir":
+			if i+1 < len(args) {
+				cfg.logDir = args[i+1]
+				i++
+			}
+		}
+	}
+	return cfg
+}
+
+func runServe(args []string) int {
+	cfg := parseServeArgs(args)
+
+	ws, err := webui.NewServeServer(cfg.logDir, cfg.port)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error: start serve UI: %v\n", err)
+		return 1
+	}
+	ws.Start()
+	fmt.Fprintf(os.Stderr, "[claude-spy] Serving logs from %s\n", cfg.logDir)
+	fmt.Fprintf(os.Stderr, "[claude-spy] Web UI: http://localhost:%d\n", ws.Port())
+	fmt.Fprintf(os.Stderr, "[claude-spy] Press Ctrl+C to exit\n\n")
+
+	sigCh := make(chan os.Signal, 1)
+	signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
+	<-sigCh
+	signal.Stop(sigCh)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	ws.Shutdown(ctx)
+	return 0
+}
+
 func runView(args []string) int {
 	if len(args) == 0 {
 		fmt.Fprintf(os.Stderr, "Usage: claude-spy view <file.jsonl> [--port <n>]\n")
@@ -258,6 +319,7 @@ Options:
 
 Subcommands:
   view <file.jsonl> [--port <n>]   Browse a recorded log file in the browser
+  serve [--port <n>] [--log-dir <dir>]   Browse all logs in a directory (default port: 8888)
 
 Example:
   claude-spy --upstream https://api.anthropic.com --port 8080
