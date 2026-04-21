@@ -485,21 +485,75 @@ function applySubFilter() {
 
 let liveSubCount = 0; // rolling counter for live mode
 
-function renderSubAgentContainer(group, subIndex) {
+// splitSubAgentSessions 把一个 sub group 的 records 按 session_fp 拆分为多个会话。
+// 返回 [{fp, records, startTime}] 列表，按 records 中第一次出现的时间排序。
+function splitSubAgentSessions(records) {
+  const sessionMap = new Map(); // fp -> {fp, records, startTime}
+  const order = [];             // 保留 fp 首次出现顺序
+  for (const r of records) {
+    const fp = r.session_fp || '';
+    if (!sessionMap.has(fp)) {
+      sessionMap.set(fp, { fp, records: [], startTime: r.timestamp });
+      order.push(fp);
+    }
+    sessionMap.get(fp).records.push(r);
+  }
+  return order.map(fp => sessionMap.get(fp));
+}
+
+function renderSubAgentContainer(group, outerIndex) {
+  const sessions = splitSubAgentSessions(group.records);
+  const hasMultiple = sessions.length > 1;
+
+  // 单个 sub-agent 会话：直接渲染原来的样式
+  if (!hasMultiple) {
+    return renderSingleSession(sessions[0], outerIndex, null);
+  }
+
+  // 多个 sub-agent 会话：外层容器包裹，内部每个 session 独立折叠
+  const wrapper = document.createElement('div');
+  wrapper.className = 'sub-agent-wrapper';
+
+  const wrapHeader = document.createElement('div');
+  wrapHeader.className = 'sub-agent-wrapper-header';
+  const totalReqs = group.records.length;
+  const totalIn  = group.records.reduce((s, r) => s + (r.in_tokens  || 0), 0);
+  const totalOut = group.records.reduce((s, r) => s + (r.out_tokens || 0), 0);
+  wrapHeader.innerHTML =
+    `<span class="group-icon">↳</span>` +
+    `<span class="group-title">子 Agent 组 #${outerIndex}</span>` +
+    `<span class="sub-meta-count group-meta">${sessions.length} 个会话 · ${totalReqs} 次请求</span>` +
+    `<span class="group-meta">· ${fmtNum(totalIn)} in / ${fmtNum(totalOut)} out</span>`;
+  wrapper.appendChild(wrapHeader);
+
+  sessions.forEach((sess, i) => {
+    wrapper.appendChild(renderSingleSession(sess, outerIndex, i + 1));
+  });
+
+  return wrapper;
+}
+
+// renderSingleSession 渲染单个 sub-agent 会话折叠块。
+// outerIndex: 父级编号（用于 label）；sessIndex: 会话内编号（null 表示唯一会话）
+function renderSingleSession(sess, outerIndex, sessIndex) {
   const container = document.createElement('div');
   container.className = 'sub-agent-container collapsed';
 
-  const totalIn  = group.records.reduce((s, r) => s + (r.in_tokens  || 0), 0);
-  const totalOut = group.records.reduce((s, r) => s + (r.out_tokens || 0), 0);
+  const totalIn  = sess.records.reduce((s, r) => s + (r.in_tokens  || 0), 0);
+  const totalOut = sess.records.reduce((s, r) => s + (r.out_tokens || 0), 0);
+
+  const label = sessIndex != null
+    ? `子 Agent #${outerIndex}-${sessIndex}`
+    : `子 Agent #${outerIndex}`;
 
   const header = document.createElement('div');
   header.className = 'sub-agent-header';
-  header.innerHTML = buildSubHeaderHTML(subIndex, group.records.length, group.startTime, totalIn, totalOut);
+  header.innerHTML = buildSubHeaderHTML(label, sess.records.length, sess.startTime, totalIn, totalOut);
   header.addEventListener('click', () => toggleSubAgent(container));
 
   const body = document.createElement('div');
   body.className = 'sub-agent-body';
-  for (const s of group.records) {
+  for (const s of sess.records) {
     body.appendChild(renderSummaryRecord(s, false));
   }
 
@@ -508,11 +562,11 @@ function renderSubAgentContainer(group, subIndex) {
   return container;
 }
 
-function buildSubHeaderHTML(subIndex, count, startTime, totalIn, totalOut) {
+function buildSubHeaderHTML(label, count, startTime, totalIn, totalOut) {
   const timeStr = fmtTime(startTime);
   return `<span class="sub-expand-icon">▶</span>` +
     `<span class="group-icon">↳</span>` +
-    `<span class="group-title">子 Agent #${subIndex}</span>` +
+    `<span class="group-title">${label}</span>` +
     `<span class="sub-meta-count group-meta">${count} 次</span>` +
     `<span class="group-meta">· ${timeStr} · ${fmtNum(totalIn)} in / ${fmtNum(totalOut)} out</span>`;
 }
@@ -524,20 +578,20 @@ function toggleSubAgent(container) {
 }
 
 function updateSubAgentHeader(container) {
-  const records = container.querySelectorAll('.record');
+  // container 可能是 sub-agent-container（单会话）或 sub-agent-wrapper（多会话）
+  // live 模式下暂时只处理 sub-agent-container
+  if (!container.classList.contains('sub-agent-container')) return;
+  const records = Array.from(container.querySelectorAll('.record')).map(el => el._summary).filter(Boolean);
   const count = records.length;
   let totalIn = 0, totalOut = 0, startTime = null;
-  records.forEach(el => {
-    const s = el._summary;
-    if (!s) return;
+  records.forEach(s => {
     totalIn  += s.in_tokens  || 0;
     totalOut += s.out_tokens || 0;
     if (!startTime) startTime = s.timestamp;
   });
-  const subIndex = parseInt(container.dataset.subIndex || '1', 10);
+  const label = container.dataset.label || `子 Agent #${container.dataset.subIndex || '?'}`;
   const header = container.querySelector('.sub-agent-header');
-  if (header) header.innerHTML = buildSubHeaderHTML(subIndex, count, startTime, totalIn, totalOut);
-  // Preserve expand/collapse icon state
+  if (header) header.innerHTML = buildSubHeaderHTML(label, count, startTime, totalIn, totalOut);
   const icon = container.querySelector('.sub-expand-icon');
   if (icon) icon.textContent = container.classList.contains('collapsed') ? '▶' : '▼';
 }
@@ -687,28 +741,54 @@ async function main() {
       accStatsSummary(summary);
 
       if (isSub) {
-        // Append to last sub-agent container, or create new one if last item is main
-        const lastChild = list.lastElementChild;
-        if (lastChild && lastChild.classList.contains('sub-agent-container')) {
-          // Continue appending to the existing sub-agent container
-          lastChild.querySelector('.sub-agent-body').appendChild(el);
-          updateSubAgentHeader(lastChild);
+        const fp = summary.session_fp || '';
+        // 在当前 list 中寻找匹配 session_fp 的容器（可能在 wrapper 内）
+        let targetContainer = null;
+        const allContainers = list.querySelectorAll('.sub-agent-container[data-session-fp]');
+        allContainers.forEach(c => {
+          if (c.dataset.sessionFp === fp) targetContainer = c;
+        });
+
+        if (targetContainer) {
+          targetContainer.querySelector('.sub-agent-body').appendChild(el);
+          updateSubAgentHeader(targetContainer);
         } else {
-          // New sub-agent starts: create container
+          // 新会话：看最后一个子元素是不是 wrapper（多会话容器）还是 main
+          const lastChild = list.lastElementChild;
           liveSubCount++;
+          const label = `子 Agent #${liveSubCount}`;
+
           const container = document.createElement('div');
           container.className = 'sub-agent-container collapsed';
           container.dataset.subIndex = liveSubCount;
+          container.dataset.sessionFp = fp;
+          container.dataset.label = label;
+
           const headerEl = document.createElement('div');
           headerEl.className = 'sub-agent-header';
-          headerEl.innerHTML = buildSubHeaderHTML(liveSubCount, 1, summary.timestamp, summary.in_tokens || 0, summary.out_tokens || 0);
+          headerEl.innerHTML = buildSubHeaderHTML(label, 1, summary.timestamp, summary.in_tokens || 0, summary.out_tokens || 0);
           headerEl.addEventListener('click', () => toggleSubAgent(container));
+
           const body = document.createElement('div');
           body.className = 'sub-agent-body';
           body.appendChild(el);
+
           container.appendChild(headerEl);
           container.appendChild(body);
-          list.appendChild(container);
+
+          // 如果上一个元素是 sub-agent-container 且 session_fp 不同，放入 wrapper
+          if (lastChild && lastChild.classList.contains('sub-agent-container') && lastChild.dataset.sessionFp !== fp) {
+            const wrapper = document.createElement('div');
+            wrapper.className = 'sub-agent-wrapper';
+            lastChild.replaceWith(wrapper);
+            wrapper.appendChild(lastChild);
+            wrapper.appendChild(container);
+            list.appendChild(wrapper);
+          } else if (lastChild && lastChild.classList.contains('sub-agent-wrapper')) {
+            lastChild.appendChild(container);
+          } else {
+            list.appendChild(container);
+          }
         }
         list.lastElementChild.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
       } else {

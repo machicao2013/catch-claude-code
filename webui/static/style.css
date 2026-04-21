@@ -383,6 +383,34 @@ body {
 .group-main { background: var(--surface); border-left: 2px solid var(--accent-blue); }
 /* .group-sub is now replaced by .sub-agent-container */
 
+/* ═══════════════ SUB-AGENT WRAPPER（多会话并列容器）═══════════════ */
+.sub-agent-wrapper {
+  margin: 8px 0;
+  border-radius: var(--radius-md);
+  border: 1px dashed var(--accent-amber);
+  padding: 6px 6px 6px 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.sub-agent-wrapper.hidden-sub { display: none; }
+
+/* wrapper 顶部标题行 */
+.sub-agent-wrapper-header {
+  display: flex; align-items: center; gap: 8px;
+  padding: 4px 8px;
+  font-size: 10px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: 0.1em;
+  color: var(--accent-amber);
+  opacity: 0.8;
+}
+
+/* wrapper 内的 container 缩进一点 */
+.sub-agent-wrapper .sub-agent-container {
+  margin: 0;
+  border-color: color-mix(in srgb, var(--accent-amber) 60%, transparent);
+}
+
 /* ═══════════════ SUB-AGENT COLLAPSIBLE CONTAINER ═══════════════ */
 .sub-agent-container {
   margin: 6px 0 6px 0;

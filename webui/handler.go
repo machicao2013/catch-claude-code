@@ -3,6 +3,7 @@ package webui
 import (
 	"bufio"
 	"compress/gzip"
+	"crypto/md5"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -35,6 +36,10 @@ type RecordSummary struct {
 	OutTokens   int64  `json:"out_tokens"`
 	CacheRead   int64  `json:"cache_read"`
 	CacheCreate int64  `json:"cache_create"`
+	// SessionFP 是 sub-agent 会话指纹：取第一条 user 消息完整内容的 MD5 前 8 位。
+	// 同一 sub-agent 会话内所有 turn 的 SessionFP 相同，用于区分并发的多个 sub-agent。
+	// main 类型的 record 此字段为空字符串。
+	SessionFP string `json:"session_fp,omitempty"`
 }
 
 func extractSummary(rec recorder.Record) RecordSummary {
@@ -54,6 +59,21 @@ func extractSummary(rec recorder.Record) RecordSummary {
 	s.Model = reqBody.Model
 	s.MsgCount = len(reqBody.Messages)
 	s.SysLen = len(reqBody.System)
+
+	// 对 sub-agent（sys_len 短），计算会话指纹：
+	// 取第一条 user 消息所有 text block 拼接后的 MD5 前 8 位。
+	// 同一 sub-agent 会话的所有 turn 共享相同的第一条 user 消息，FP 恒定。
+	if s.SysLen <= 5000 && len(reqBody.Messages) > 0 {
+		var firstMsg struct {
+			Role    string          `json:"role"`
+			Content json.RawMessage `json:"content"`
+		}
+		if err := json.Unmarshal(reqBody.Messages[0], &firstMsg); err == nil && firstMsg.Role == "user" {
+			fullText := extractTextFromContent(firstMsg.Content)
+			h := md5.Sum([]byte(fullText))
+			s.SessionFP = fmt.Sprintf("%x", h[:4])
+		}
+	}
 
 	// 从 response body 提取 usage 和 stop_reason
 	// 兼容 Anthropic 格式（input_tokens）和 OpenAI/GLM 格式（prompt_tokens）
@@ -256,4 +276,28 @@ func parseIntParam(r *http.Request, name string, defaultVal int) int {
 		return defaultVal
 	}
 	return n
+}
+
+// extractTextFromContent 从 content 字段（字符串或 block 数组）提取纯文本。
+func extractTextFromContent(raw json.RawMessage) string {
+	// 尝试解析为 string
+	var s string
+	if err := json.Unmarshal(raw, &s); err == nil {
+		return s
+	}
+	// 尝试解析为 block 数组
+	var blocks []struct {
+		Type string `json:"type"`
+		Text string `json:"text"`
+	}
+	if err := json.Unmarshal(raw, &blocks); err == nil {
+		var sb strings.Builder
+		for _, b := range blocks {
+			if b.Type == "text" {
+				sb.WriteString(b.Text)
+			}
+		}
+		return sb.String()
+	}
+	return string(raw)
 }
