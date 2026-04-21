@@ -228,7 +228,7 @@ func (s *Server) renderViewerPage(w http.ResponseWriter, r *http.Request, filena
 	page := strings.ReplaceAll(string(data), "?v=2", "?v="+ver)
 
 	// Inject back-link after the logo span
-	backLink := `<a href="/" class="back-link">← 返回列表</a>`
+	backLink := `<a href="./" class="back-link">← 返回列表</a>`
 	page = strings.Replace(page,
 		`<span class="logo">claude-spy</span>`,
 		`<span class="logo">claude-spy</span>`+backLink,

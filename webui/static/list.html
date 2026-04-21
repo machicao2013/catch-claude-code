@@ -72,8 +72,20 @@
 
     function parseFilename(name) {
       const m = name.match(/^(\d{4})(\d{2})(\d{2})_(\d{2})(\d{2})(\d{2})/);
-      if (!m) return name;
+      if (!m) return null;
       return `${m[1]}-${m[2]}-${m[3]} ${m[4]}:${m[5]}:${m[6]}`;
+    }
+
+    function fmtMtime(mtime) {
+      if (!mtime) return '—';
+      const d = new Date(mtime);
+      if (isNaN(d)) return mtime;
+      const pad = n => String(n).padStart(2, '0');
+      return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+    }
+
+    function getDisplayTime(f) {
+      return parseFilename(f.filename) || fmtMtime(f.mtime);
     }
 
     function fmtSize(bytes) {
@@ -112,10 +124,10 @@
       for (const f of files) {
         const tr = document.createElement('tr');
         tr.innerHTML = `
-          <td class="file-time">${parseFilename(f.filename)}</td>
-          <td><a href="/${encodeURIComponent(f.filename)}">${f.filename}</a></td>
+          <td class="file-time">${getDisplayTime(f)}</td>
+          <td><a href="${encodeURIComponent(f.filename)}">${f.filename}</a></td>
           <td class="file-size">${fmtSize(f.size)}</td>`;
-        tr.addEventListener('click', () => { location.href = '/' + encodeURIComponent(f.filename); });
+        tr.addEventListener('click', () => { location.href = encodeURIComponent(f.filename); });
         tbody.appendChild(tr);
       }
     }

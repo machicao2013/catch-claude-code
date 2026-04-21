@@ -381,7 +381,52 @@ body {
 .group-meta { color: var(--text-muted); font-weight: 400; font-size: 10px; letter-spacing: 0.02em; }
 
 .group-main { background: var(--surface); border-left: 2px solid var(--accent-blue); }
-.group-sub { background: var(--surface-alt); border-left: 2px solid var(--accent-amber); opacity: 0.8; }
+/* .group-sub is now replaced by .sub-agent-container */
+
+/* ═══════════════ SUB-AGENT COLLAPSIBLE CONTAINER ═══════════════ */
+.sub-agent-container {
+  margin: 6px 0 6px 0;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--accent-amber);
+  background: var(--surface-alt);
+  transition: border-color var(--transition-fast);
+}
+.sub-agent-container.hidden-sub { display: none; }
+
+/* header row (click to toggle) */
+.sub-agent-header {
+  display: flex; align-items: center; gap: 8px;
+  padding: 7px 12px;
+  cursor: pointer; user-select: none;
+  font-size: 10px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: 0.1em;
+  border-radius: var(--radius-md);
+  border-left: 3px solid var(--accent-amber);
+  transition: background var(--transition-fast);
+}
+.sub-agent-header:hover { background: var(--surface-hover); }
+.sub-expand-icon {
+  font-size: 8px; color: var(--accent-amber); flex-shrink: 0;
+}
+
+/* body: records inside container */
+.sub-agent-body {
+  padding: 4px 8px 8px 12px;
+  display: flex; flex-direction: column; gap: 2px;
+}
+
+/* collapsed hides body */
+.sub-agent-container.collapsed .sub-agent-body { display: none; }
+
+/* sub-meta pill */
+.sub-meta-count {
+  background: var(--accent-amber);
+  color: #000;
+  border-radius: 8px;
+  padding: 1px 6px;
+  font-size: 9px;
+  font-weight: 700;
+}
 
 /* ═══════════════ RECORD CARD ═══════════════ */
 .record {
@@ -404,10 +449,17 @@ body {
 .record.has-error { border-left: 2px solid var(--accent-red); }
 .record.has-error .record-header { background: var(--error-bg); }
 .record.has-error .req-stop { color: var(--accent-red); background: var(--error-bg); border-color: var(--error-border); }
+/* sub+error: error 优先，但保留缩进 */
+.record.is-sub.has-error { border-left: 3px solid var(--accent-red); }
 
-.record.is-sub { opacity: 0.55; }
-.record.is-sub:hover { opacity: 0.85; }
-.record.is-sub .req-id::after { content: ' ⚡'; font-size: 8px; opacity: 0.7; }
+/* sub record: inside sub-agent-container, no extra left margin needed */
+.record.is-sub {
+  opacity: 0.85;
+  border-left: 2px solid var(--accent-amber);
+  background: var(--surface-alt);
+}
+.record.is-sub:hover { opacity: 1; }
+.record.is-sub .req-id::after { content: ' ↳'; font-size: 9px; opacity: 0.6; }
 
 .record-header {
   display: flex; align-items: center; justify-content: space-between;

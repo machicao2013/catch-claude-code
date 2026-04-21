@@ -476,12 +476,70 @@ function setupSubToggle() {
 }
 
 function applySubFilter() {
-  document.querySelectorAll('.record.is-sub').forEach(el => {
+  document.querySelectorAll('.sub-agent-container').forEach(el => {
     el.classList.toggle('hidden-sub', !showSubRequests);
   });
-  document.querySelectorAll('.group-sub').forEach(el => {
-    el.classList.toggle('hidden-sub', !showSubRequests);
+}
+
+// ── Sub-agent Collapsible Container ─────────────────────────
+
+let liveSubCount = 0; // rolling counter for live mode
+
+function renderSubAgentContainer(group, subIndex) {
+  const container = document.createElement('div');
+  container.className = 'sub-agent-container collapsed';
+
+  const totalIn  = group.records.reduce((s, r) => s + (r.in_tokens  || 0), 0);
+  const totalOut = group.records.reduce((s, r) => s + (r.out_tokens || 0), 0);
+
+  const header = document.createElement('div');
+  header.className = 'sub-agent-header';
+  header.innerHTML = buildSubHeaderHTML(subIndex, group.records.length, group.startTime, totalIn, totalOut);
+  header.addEventListener('click', () => toggleSubAgent(container));
+
+  const body = document.createElement('div');
+  body.className = 'sub-agent-body';
+  for (const s of group.records) {
+    body.appendChild(renderSummaryRecord(s, false));
+  }
+
+  container.appendChild(header);
+  container.appendChild(body);
+  return container;
+}
+
+function buildSubHeaderHTML(subIndex, count, startTime, totalIn, totalOut) {
+  const timeStr = fmtTime(startTime);
+  return `<span class="sub-expand-icon">▶</span>` +
+    `<span class="group-icon">↳</span>` +
+    `<span class="group-title">子 Agent #${subIndex}</span>` +
+    `<span class="sub-meta-count group-meta">${count} 次</span>` +
+    `<span class="group-meta">· ${timeStr} · ${fmtNum(totalIn)} in / ${fmtNum(totalOut)} out</span>`;
+}
+
+function toggleSubAgent(container) {
+  const collapsed = container.classList.toggle('collapsed');
+  const icon = container.querySelector('.sub-expand-icon');
+  if (icon) icon.textContent = collapsed ? '▶' : '▼';
+}
+
+function updateSubAgentHeader(container) {
+  const records = container.querySelectorAll('.record');
+  const count = records.length;
+  let totalIn = 0, totalOut = 0, startTime = null;
+  records.forEach(el => {
+    const s = el._summary;
+    if (!s) return;
+    totalIn  += s.in_tokens  || 0;
+    totalOut += s.out_tokens || 0;
+    if (!startTime) startTime = s.timestamp;
   });
+  const subIndex = parseInt(container.dataset.subIndex || '1', 10);
+  const header = container.querySelector('.sub-agent-header');
+  if (header) header.innerHTML = buildSubHeaderHTML(subIndex, count, startTime, totalIn, totalOut);
+  // Preserve expand/collapse icon state
+  const icon = container.querySelector('.sub-expand-icon');
+  if (icon) icon.textContent = container.classList.contains('collapsed') ? '▶' : '▼';
 }
 
 // ── Record Grouping (对话 vs 子请求) ─────────────────────────
@@ -502,7 +560,6 @@ function groupRecords(summaries) {
     const type = classifyRecord(s);
 
     if (!currentGroup || currentGroup.type !== type) {
-      // 开始新组
       currentGroup = {
         type,
         records: [s],
@@ -518,19 +575,13 @@ function groupRecords(summaries) {
   return groups;
 }
 
+// renderGroupHeader: only used for 'main' groups now
 function renderGroupHeader(group) {
   const el = document.createElement('div');
-  el.className = `group-header group-${group.type}`;
-
+  el.className = `group-header group-main`;
   const count = group.records.length;
   const timeStr = fmtTime(group.startTime);
-
-  if (group.type === 'main') {
-    el.innerHTML = `<span class="group-icon">💬</span> <span class="group-title">主对话</span> <span class="group-meta">${count} 次请求 · 起始 ${timeStr}</span>`;
-  } else {
-    el.innerHTML = `<span class="group-icon">⚡</span> <span class="group-title">子请求</span> <span class="group-meta">${count} 次 · 起始 ${timeStr} · 工具调用 / 摘要等内部请求</span>`;
-  }
-
+  el.innerHTML = `<span class="group-icon">💬</span> <span class="group-title">主对话</span> <span class="group-meta">${count} 次请求 · 起始 ${timeStr}</span>`;
   return el;
 }
 
@@ -589,11 +640,21 @@ async function main() {
     list.innerHTML = '<div class="empty-state"><div class="emoji">📋</div>暂无记录</div>';
   } else {
     const groups = groupRecords(summaries);
+    let subIndex = 0;
     for (const group of groups) {
-      list.appendChild(renderGroupHeader(group));
-      for (const s of group.records) {
-        list.appendChild(renderSummaryRecord(s, false));
-        accStatsSummary(s);
+      if (group.type === 'main') {
+        list.appendChild(renderGroupHeader(group));
+        for (const s of group.records) {
+          list.appendChild(renderSummaryRecord(s, false));
+          accStatsSummary(s);
+        }
+      } else {
+        // sub-agent: wrap in collapsible container
+        subIndex++;
+        const container = renderSubAgentContainer(group, subIndex);
+        container.dataset.subIndex = subIndex;
+        list.appendChild(container);
+        group.records.forEach(s => accStatsSummary(s));
       }
     }
   }
@@ -620,11 +681,40 @@ async function main() {
       const empty = list.querySelector('.empty-state');
       if (empty) empty.remove();
 
+      const isSub = classifyRecord(summary) === 'sub';
       const el = renderSummaryRecord(summary, true);
       el._fullRec = rec;
-      list.appendChild(el);
       accStatsSummary(summary);
-      el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+
+      if (isSub) {
+        // Append to last sub-agent container, or create new one if last item is main
+        const lastChild = list.lastElementChild;
+        if (lastChild && lastChild.classList.contains('sub-agent-container')) {
+          // Continue appending to the existing sub-agent container
+          lastChild.querySelector('.sub-agent-body').appendChild(el);
+          updateSubAgentHeader(lastChild);
+        } else {
+          // New sub-agent starts: create container
+          liveSubCount++;
+          const container = document.createElement('div');
+          container.className = 'sub-agent-container collapsed';
+          container.dataset.subIndex = liveSubCount;
+          const headerEl = document.createElement('div');
+          headerEl.className = 'sub-agent-header';
+          headerEl.innerHTML = buildSubHeaderHTML(liveSubCount, 1, summary.timestamp, summary.in_tokens || 0, summary.out_tokens || 0);
+          headerEl.addEventListener('click', () => toggleSubAgent(container));
+          const body = document.createElement('div');
+          body.className = 'sub-agent-body';
+          body.appendChild(el);
+          container.appendChild(headerEl);
+          container.appendChild(body);
+          list.appendChild(container);
+        }
+        list.lastElementChild.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      } else {
+        list.appendChild(el);
+        el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      }
     });
     es.onerror = () => {
       badge.textContent = '连接中断';
