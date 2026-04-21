@@ -289,6 +289,19 @@ func (h *Handler) recordAndSummarize(reqNum int, reqBody, respBody []byte, r *ht
 		respH[k] = respHeaders.Get(k)
 	}
 
+	// 提取原始 usage 字段写入日志，便于排查上游返回格式
+	var rawUsage json.RawMessage
+	var usageSrc struct {
+		Usage json.RawMessage `json:"usage"`
+	}
+	if isSSE {
+		// SSE 已组装成 finalRespBody，从中提取
+		json.Unmarshal(finalRespBody, &usageSrc)
+	} else {
+		json.Unmarshal(respBody, &usageSrc)
+	}
+	rawUsage = usageSrc.Usage
+
 	rec := recorder.Record{
 		ID:         fmt.Sprintf("req_%03d", reqNum),
 		Timestamp:  time.Now().UTC().Format(time.RFC3339Nano),
@@ -300,9 +313,10 @@ func (h *Handler) recordAndSummarize(reqNum int, reqBody, respBody []byte, r *ht
 			Body:    toRawJSON(reqBody),
 		},
 		Response: recorder.ResponseData{
-			Status:  status,
-			Headers: respH,
-			Body:    toRawJSON(finalRespBody),
+			Status:   status,
+			Headers:  respH,
+			Body:     toRawJSON(finalRespBody),
+			RawUsage: rawUsage,
 		},
 	}
 

@@ -18,9 +18,10 @@ type RequestData struct {
 }
 
 type ResponseData struct {
-	Status  int               `json:"status"`
-	Headers map[string]string `json:"headers"`
-	Body    json.RawMessage   `json:"body"`
+	Status   int               `json:"status"`
+	Headers  map[string]string `json:"headers"`
+	Body     json.RawMessage   `json:"body"`
+	RawUsage json.RawMessage   `json:"raw_usage,omitempty"` // 原始 usage 字段，用于调试
 }
 
 type Recorder interface {
