@@ -8,56 +8,57 @@
 
 /* ═══════════════ THEME: OBSIDIAN ═══════════════ */
 [data-theme="obsidian"] {
-  --bg:              #090d18;
-  --bg-deep:         #060a12;
+  --bg:              #0d1117;
+  --bg-deep:         #080c12;
   --surface:         #111827;
-  --surface-hover:   #1a2540;
-  --surface-alt:     #0d1320;
-  --border:          #1c2b45;
-  --border-subtle:   #131d33;
-  --border-accent:   #233660;
+  --surface-hover:   #172035;
+  --surface-alt:     #0e1520;
+  --border:          #1a2840;
+  --border-subtle:   #121c30;
+  --border-accent:   #1e2e50;
 
-  --text:            #e8edf5;
-  --text-secondary:  #8b9ab8;
-  --text-muted:      #4a5877;
+  --text:            #cdd5e0;
+  --text-secondary:  #7a8ba4;
+  --text-muted:      #3f506a;
 
-  --accent-blue:     #5b9ef5;
-  --accent-green:    #3dd68c;
-  --accent-purple:   #a78bfa;
-  --accent-amber:    #f5b731;
-  --accent-red:      #f06060;
-  --accent-cyan:     #22d3ee;
+  /* 降饱和度、调暗，避免霓虹刺眼感 */
+  --accent-blue:     #6e9dc4;
+  --accent-green:    #4a9e74;
+  --accent-purple:   #8c7ec0;
+  --accent-amber:    #b88840;
+  --accent-red:      #b86060;
+  --accent-cyan:     #4aa8bc;
 
-  --role-user-bg:    rgba(245,183,49,0.12);
-  --role-user-text:  #f5b731;
-  --role-asst-bg:    rgba(167,139,250,0.12);
-  --role-asst-text:  #c4b5fd;
-  --role-tool-bg:    rgba(61,214,140,0.08);
-  --role-tool-text:  #3dd68c;
-  --role-tool-border:#1a5c3a;
-  --role-result-bg:  rgba(139,154,184,0.06);
-  --role-result-text:#6b7c99;
-  --role-think-bg:   rgba(167,139,250,0.06);
-  --role-think-text: #a78bfa;
-  --role-think-border:rgba(167,139,250,0.2);
+  --role-user-bg:    rgba(184,136,64,0.10);
+  --role-user-text:  #b88840;
+  --role-asst-bg:    rgba(140,126,192,0.10);
+  --role-asst-text:  #a898cc;
+  --role-tool-bg:    rgba(74,158,116,0.08);
+  --role-tool-text:  #4a9e74;
+  --role-tool-border:#1a4a34;
+  --role-result-bg:  rgba(122,139,164,0.06);
+  --role-result-text:#5c6e88;
+  --role-think-bg:   rgba(140,126,192,0.06);
+  --role-think-text: #8c7ec0;
+  --role-think-border:rgba(140,126,192,0.18);
 
-  --error-bg:        rgba(240,96,96,0.06);
-  --error-border:    rgba(240,96,96,0.2);
-  --error-text:      #fca5a5;
-  --error-accent:    #f06060;
+  --error-bg:        rgba(184,96,96,0.07);
+  --error-border:    rgba(184,96,96,0.18);
+  --error-text:      #d49090;
+  --error-accent:    #b86060;
 
-  --status-ok:       #3dd68c;
-  --status-err:      #f06060;
+  --status-ok:       #4a9e74;
+  --status-err:      #b86060;
 
-  --badge-live-bg:   rgba(61,214,140,0.12);
-  --badge-live-text: #3dd68c;
-  --badge-view-bg:   rgba(91,158,245,0.1);
-  --badge-view-text: #5b9ef5;
+  --badge-live-bg:   rgba(74,158,116,0.12);
+  --badge-live-text: #4a9e74;
+  --badge-view-bg:   rgba(110,157,196,0.10);
+  --badge-view-text: #6e9dc4;
 
   --shadow-sm:       0 1px 2px rgba(0,0,0,0.5);
   --shadow-md:       0 4px 16px rgba(0,0,0,0.6);
   --shadow-lg:       0 8px 32px rgba(0,0,0,0.7);
-  --shadow-glow-blue:0 0 20px rgba(91,158,245,0.08);
+  --shadow-glow-blue:0 0 16px rgba(110,157,196,0.06);
 
   --radius-sm:       3px;
   --radius-md:       6px;
@@ -68,56 +69,57 @@
 
 /* ═══════════════ THEME: DAYLIGHT ═══════════════ */
 [data-theme="daylight"] {
-  --bg:              #f5f5f0;
-  --bg-deep:         #eaeae4;
-  --surface:         #ffffff;
-  --surface-hover:   #f0f0eb;
-  --surface-alt:     #fafaf7;
-  --border:          #d4d4cc;
-  --border-subtle:   #e8e8e2;
-  --border-accent:   #b8b8b0;
+  --bg:              #f4f3ef;
+  --bg-deep:         #e8e7e2;
+  --surface:         #fdfcfb;
+  --surface-hover:   #eeecea;
+  --surface-alt:     #f8f7f4;
+  --border:          #d0cfc8;
+  --border-subtle:   #e4e3dc;
+  --border-accent:   #b4b3ac;
 
-  --text:            #1a1a18;
-  --text-secondary:  #5c5c58;
-  --text-muted:      #9c9c96;
+  --text:            #22201c;
+  --text-secondary:  #56544e;
+  --text-muted:      #96948e;
 
-  --accent-blue:     #1a6ee0;
-  --accent-green:    #0d8a50;
-  --accent-purple:   #6d28d9;
-  --accent-amber:    #b8860b;
-  --accent-red:      #c42b2b;
-  --accent-cyan:     #0e7490;
+  /* 降饱和、加深以减少刺激感 */
+  --accent-blue:     #2a68b4;
+  --accent-green:    #286e46;
+  --accent-purple:   #6040aa;
+  --accent-amber:    #8c6800;
+  --accent-red:      #a62424;
+  --accent-cyan:     #1a6070;
 
-  --role-user-bg:    rgba(184,134,11,0.08);
-  --role-user-text:  #92690a;
-  --role-asst-bg:    rgba(109,40,217,0.06);
-  --role-asst-text:  #5b21b6;
-  --role-tool-bg:    rgba(13,138,80,0.06);
-  --role-tool-text:  #0d8a50;
-  --role-tool-border:rgba(13,138,80,0.2);
-  --role-result-bg:  rgba(92,92,88,0.04);
-  --role-result-text:#6b6b66;
-  --role-think-bg:   rgba(109,40,217,0.04);
-  --role-think-text: #6d28d9;
-  --role-think-border:rgba(109,40,217,0.15);
+  --role-user-bg:    rgba(140,104,0,0.07);
+  --role-user-text:  #7a5800;
+  --role-asst-bg:    rgba(96,64,170,0.06);
+  --role-asst-text:  #503496;
+  --role-tool-bg:    rgba(40,110,70,0.06);
+  --role-tool-text:  #286e46;
+  --role-tool-border:rgba(40,110,70,0.18);
+  --role-result-bg:  rgba(86,84,78,0.04);
+  --role-result-text:#64625c;
+  --role-think-bg:   rgba(96,64,170,0.04);
+  --role-think-text: #6040aa;
+  --role-think-border:rgba(96,64,170,0.14);
 
-  --error-bg:        rgba(196,43,43,0.04);
-  --error-border:    rgba(196,43,43,0.15);
-  --error-text:      #991b1b;
-  --error-accent:    #c42b2b;
+  --error-bg:        rgba(166,36,36,0.04);
+  --error-border:    rgba(166,36,36,0.14);
+  --error-text:      #7c1818;
+  --error-accent:    #a62424;
 
-  --status-ok:       #0d8a50;
-  --status-err:      #c42b2b;
+  --status-ok:       #286e46;
+  --status-err:      #a62424;
 
-  --badge-live-bg:   rgba(13,138,80,0.1);
-  --badge-live-text: #0d8a50;
-  --badge-view-bg:   rgba(26,110,224,0.08);
-  --badge-view-text: #1a6ee0;
+  --badge-live-bg:   rgba(40,110,70,0.09);
+  --badge-live-text: #286e46;
+  --badge-view-bg:   rgba(42,104,180,0.08);
+  --badge-view-text: #2a68b4;
 
   --shadow-sm:       0 1px 2px rgba(0,0,0,0.05);
   --shadow-md:       0 2px 8px rgba(0,0,0,0.08);
   --shadow-lg:       0 4px 16px rgba(0,0,0,0.1);
-  --shadow-glow-blue:0 0 12px rgba(26,110,224,0.06);
+  --shadow-glow-blue:0 0 12px rgba(42,104,180,0.06);
 
   --radius-sm:       3px;
   --radius-md:       6px;
@@ -128,56 +130,57 @@
 
 /* ═══════════════ THEME: PHOSPHOR ═══════════════ */
 [data-theme="phosphor"] {
-  --bg:              #020604;
-  --bg-deep:         #000000;
-  --surface:         #040a06;
-  --surface-hover:   #081408;
-  --surface-alt:     #030804;
-  --border:          #0d2a0d;
-  --border-subtle:   #081a08;
-  --border-accent:   #145014;
+  --bg:              #030704;
+  --bg-deep:         #010401;
+  --surface:         #050c06;
+  --surface-hover:   #091408;
+  --surface-alt:     #040a05;
+  --border:          #0c260e;
+  --border-subtle:   #081808;
+  --border-accent:   #124812;
 
-  --text:            #20ee20;
-  --text-secondary:  #16aa16;
-  --text-muted:      #0d660d;
+  --text:            #7ccf7c;
+  --text-secondary:  #5aaa5a;
+  --text-muted:      #305830;
 
-  --accent-blue:     #20ee20;
-  --accent-green:    #20ee20;
-  --accent-purple:   #44ff44;
-  --accent-amber:    #88ee20;
-  --accent-red:      #ee2020;
-  --accent-cyan:     #20ee20;
+  /* 降亮度：从 #20ee20 降到更柔和的墨绿色系 */
+  --accent-blue:     #7ccf7c;
+  --accent-green:    #7ccf7c;
+  --accent-purple:   #96d496;
+  --accent-amber:    #a0cc60;
+  --accent-red:      #cc5050;
+  --accent-cyan:     #7ccf7c;
 
-  --role-user-bg:    rgba(136,238,32,0.08);
-  --role-user-text:  #88ee20;
-  --role-asst-bg:    rgba(32,238,32,0.06);
-  --role-asst-text:  #20ee20;
-  --role-tool-bg:    rgba(32,238,32,0.04);
-  --role-tool-text:  #20ee20;
-  --role-tool-border:#0d3a0d;
-  --role-result-bg:  rgba(32,238,32,0.03);
-  --role-result-text:#16aa16;
-  --role-think-bg:   rgba(68,255,68,0.03);
-  --role-think-text: #16aa16;
-  --role-think-border:#0d3a0d;
+  --role-user-bg:    rgba(160,204,96,0.07);
+  --role-user-text:  #a0cc60;
+  --role-asst-bg:    rgba(124,207,124,0.06);
+  --role-asst-text:  #7ccf7c;
+  --role-tool-bg:    rgba(124,207,124,0.04);
+  --role-tool-text:  #7ccf7c;
+  --role-tool-border:#0c360e;
+  --role-result-bg:  rgba(124,207,124,0.03);
+  --role-result-text:#5aaa5a;
+  --role-think-bg:   rgba(150,212,150,0.03);
+  --role-think-text: #5aaa5a;
+  --role-think-border:#0c360e;
 
-  --error-bg:        rgba(238,32,32,0.06);
-  --error-border:    rgba(238,32,32,0.2);
-  --error-text:      #ff6666;
-  --error-accent:    #ee2020;
+  --error-bg:        rgba(204,80,80,0.06);
+  --error-border:    rgba(204,80,80,0.2);
+  --error-text:      #cc9090;
+  --error-accent:    #cc5050;
 
-  --status-ok:       #20ee20;
-  --status-err:      #ee2020;
+  --status-ok:       #7ccf7c;
+  --status-err:      #cc5050;
 
-  --badge-live-bg:   rgba(32,238,32,0.1);
-  --badge-live-text: #20ee20;
-  --badge-view-bg:   rgba(32,238,32,0.06);
-  --badge-view-text: #20ee20;
+  --badge-live-bg:   rgba(124,207,124,0.10);
+  --badge-live-text: #7ccf7c;
+  --badge-view-bg:   rgba(124,207,124,0.06);
+  --badge-view-text: #7ccf7c;
 
-  --shadow-sm:       0 0 4px rgba(32,238,32,0.06);
-  --shadow-md:       0 0 12px rgba(32,238,32,0.08);
-  --shadow-lg:       0 0 24px rgba(32,238,32,0.1);
-  --shadow-glow-blue:0 0 16px rgba(32,238,32,0.12);
+  --shadow-sm:       0 0 4px rgba(124,207,124,0.05);
+  --shadow-md:       0 0 12px rgba(124,207,124,0.06);
+  --shadow-lg:       0 0 24px rgba(124,207,124,0.08);
+  --shadow-glow-blue:0 0 16px rgba(124,207,124,0.10);
 
   --radius-sm:       1px;
   --radius-md:       2px;
@@ -733,7 +736,7 @@ body {
   background-image:
     repeating-linear-gradient(
       transparent 0px,
-      rgba(32,238,32,0.015) 1px,
+      rgba(124,207,124,0.012) 1px,
       transparent 2px
     );
 }
@@ -744,22 +747,22 @@ body {
   pointer-events: none; z-index: 9999;
 }
 [data-theme="phosphor"] .logo {
-  text-shadow: 0 0 8px rgba(32,238,32,0.5), 0 0 16px rgba(32,238,32,0.25);
+  text-shadow: 0 0 8px rgba(124,207,124,0.35), 0 0 16px rgba(124,207,124,0.15);
 }
 [data-theme="phosphor"] .req-id {
-  text-shadow: 0 0 4px rgba(32,238,32,0.3);
+  text-shadow: 0 0 4px rgba(124,207,124,0.22);
 }
 [data-theme="phosphor"] .badge.live {
-  box-shadow: 0 0 6px rgba(32,238,32,0.3), inset 0 0 4px rgba(32,238,32,0.1);
+  box-shadow: 0 0 6px rgba(124,207,124,0.22), inset 0 0 4px rgba(124,207,124,0.08);
 }
 [data-theme="phosphor"] .record:hover {
-  box-shadow: 0 0 8px rgba(32,238,32,0.08);
+  box-shadow: 0 0 8px rgba(124,207,124,0.06);
 }
 [data-theme="phosphor"] .search-bar:focus-within {
-  box-shadow: 0 0 6px rgba(32,238,32,0.2);
+  box-shadow: 0 0 6px rgba(124,207,124,0.16);
 }
 [data-theme="phosphor"] .toggle-btn:hover {
-  text-shadow: 0 0 4px rgba(32,238,32,0.4);
+  text-shadow: 0 0 4px rgba(124,207,124,0.28);
 }
 
 /* ═══════════════ CLAUDE THEME: WARM ACCENTS ═══════════════ */

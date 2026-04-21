@@ -24,11 +24,12 @@ type AssembledMessage struct {
 }
 
 type ContentBlock struct {
-	Type  string          `json:"type"`
-	Text  string          `json:"text,omitempty"`
-	ID    string          `json:"id,omitempty"`
-	Name  string          `json:"name,omitempty"`
-	Input json.RawMessage `json:"input,omitempty"`
+	Type     string          `json:"type"`
+	Text     string          `json:"text,omitempty"`
+	Thinking string          `json:"thinking,omitempty"`
+	ID       string          `json:"id,omitempty"`
+	Name     string          `json:"name,omitempty"`
+	Input    json.RawMessage `json:"input,omitempty"`
 }
 
 type AssembledUsage struct {
@@ -68,10 +69,11 @@ func ReassembleSSEResponse(raw []byte) (*AssembledMessage, error) {
 
 	var msg AssembledMessage
 	type blockBuilder struct {
-		typ       string
-		text      strings.Builder
-		id        string
-		name      string
+		typ      string
+		text     strings.Builder
+		thinking strings.Builder
+		id       string
+		name     string
 		inputJSON strings.Builder
 	}
 	blocks := make(map[int]*blockBuilder)
@@ -128,6 +130,7 @@ func ReassembleSSEResponse(raw []byte) (*AssembledMessage, error) {
 				Delta struct {
 					Type        string `json:"type"`
 					Text        string `json:"text"`
+					Thinking    string `json:"thinking"`
 					PartialJSON string `json:"partial_json"`
 				} `json:"delta"`
 			}
@@ -135,6 +138,8 @@ func ReassembleSSEResponse(raw []byte) (*AssembledMessage, error) {
 			if b, ok := blocks[delta.Index]; ok {
 				if delta.Delta.Type == "text_delta" {
 					b.text.WriteString(delta.Delta.Text)
+				} else if delta.Delta.Type == "thinking_delta" {
+					b.thinking.WriteString(delta.Delta.Thinking)
 				} else if delta.Delta.Type == "input_json_delta" {
 					b.inputJSON.WriteString(delta.Delta.PartialJSON)
 				}
@@ -170,6 +175,8 @@ func ReassembleSSEResponse(raw []byte) (*AssembledMessage, error) {
 		switch b.typ {
 		case "text":
 			cb.Text = b.text.String()
+		case "thinking":
+			cb.Thinking = b.thinking.String()
 		case "tool_use":
 			cb.ID = b.id
 			cb.Name = b.name
