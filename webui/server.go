@@ -17,14 +17,16 @@ import (
 type Mode string
 
 const (
-	ModeLive Mode = "live" // 实时模式：配合代理使用
-	ModeView Mode = "view" // 回顾模式：查看历史 JSONL
+	ModeLive  Mode = "live"  // 实时模式：配合代理使用
+	ModeView  Mode = "view"  // 回顾模式：查看历史 JSONL
+	ModeServe Mode = "serve" // 服务模式：浏览日志目录
 )
 
 // Server 提供 Web UI 的 HTTP 服务。
 type Server struct {
 	mode     Mode
 	filename string // 日志文件名（显示用）
+	logDir   string // serve 模式：日志根目录
 
 	mu      sync.RWMutex
 	records []recorder.Record
@@ -60,6 +62,27 @@ func NewServer(mode Mode, filename string, port int) (*Server, error) {
 }
 
 func (s *Server) Port() int { return s.port }
+
+// NewServeServer 创建 serve 模式的 Server。
+// port=0 时自动选择空闲端口。
+func NewServeServer(logDir string, port int) (*Server, error) {
+	addr := fmt.Sprintf("0.0.0.0:%d", port)
+	ln, err := net.Listen("tcp", addr)
+	if err != nil {
+		return nil, fmt.Errorf("webui listen on %s: %w", addr, err)
+	}
+	s := &Server{
+		mode:     ModeServe,
+		logDir:   logDir,
+		subs:     make(map[chan []byte]struct{}),
+		listener: ln,
+		port:     ln.Addr().(*net.TCPAddr).Port,
+	}
+	mux := http.NewServeMux()
+	s.registerServeRoutes(mux)
+	s.httpServer = &http.Server{Handler: mux}
+	return s, nil
+}
 
 func (s *Server) URL() string { return fmt.Sprintf("http://localhost:%d", s.port) }
 
