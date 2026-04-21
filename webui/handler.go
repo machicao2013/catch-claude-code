@@ -56,19 +56,31 @@ func extractSummary(rec recorder.Record) RecordSummary {
 	s.SysLen = len(reqBody.System)
 
 	// 从 response body 提取 usage 和 stop_reason
+	// 兼容 Anthropic 格式（input_tokens）和 OpenAI/GLM 格式（prompt_tokens）
 	var respBody struct {
 		StopReason string `json:"stop_reason"`
 		Usage      struct {
+			// Anthropic 格式
 			InputTokens  int64 `json:"input_tokens"`
 			OutputTokens int64 `json:"output_tokens"`
 			CacheRead    int64 `json:"cache_read_input_tokens"`
 			CacheCreate  int64 `json:"cache_creation_input_tokens"`
+			// OpenAI / GLM 兼容格式
+			PromptTokens     int64 `json:"prompt_tokens"`
+			CompletionTokens int64 `json:"completion_tokens"`
 		} `json:"usage"`
 	}
 	json.Unmarshal(rec.Response.Body, &respBody)
 	s.StopReason = respBody.StopReason
+	// 优先使用 Anthropic 格式，fallback 到 OpenAI/GLM 格式
 	s.InTokens = respBody.Usage.InputTokens
+	if s.InTokens == 0 {
+		s.InTokens = respBody.Usage.PromptTokens
+	}
 	s.OutTokens = respBody.Usage.OutputTokens
+	if s.OutTokens == 0 {
+		s.OutTokens = respBody.Usage.CompletionTokens
+	}
 	s.CacheRead = respBody.Usage.CacheRead
 	s.CacheCreate = respBody.Usage.CacheCreate
 

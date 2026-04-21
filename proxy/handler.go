@@ -242,14 +242,24 @@ func (h *Handler) recordAndSummarize(reqNum int, reqBody, respBody []byte, r *ht
 		var msg struct {
 			StopReason string `json:"stop_reason"`
 			Usage      struct {
+				// Anthropic 格式
 				InputTokens  int64 `json:"input_tokens"`
 				OutputTokens int64 `json:"output_tokens"`
+				// OpenAI / GLM 兼容格式
+				PromptTokens     int64 `json:"prompt_tokens"`
+				CompletionTokens int64 `json:"completion_tokens"`
 			} `json:"usage"`
 		}
 		json.Unmarshal(respBody, &msg)
 		stopReason = msg.StopReason
 		inTokens = msg.Usage.InputTokens
+		if inTokens == 0 {
+			inTokens = msg.Usage.PromptTokens
+		}
 		outTokens = msg.Usage.OutputTokens
+		if outTokens == 0 {
+			outTokens = msg.Usage.CompletionTokens
+		}
 	}
 
 	h.printer.PrintResponseSummary(reqNum, display.ResponseSummary{
